@@ -1,0 +1,101 @@
+{
+  "3e00c833-8752-492b-aebc-38472a1450ad": {
+    "user_id": "3e00c833-8752-492b-aebc-38472a1450ad",
+    "balance": 100.5,
+    "available": 100.5,
+    "pending": 0.0,
+    "currency": "BRL",
+    "created_at": "2025-08-27T21:49:52.102512",
+    "updated_at": "2025-08-27T21:50:07.120003"
+  },
+  "fc1581a3-4f0e-4882-8d4c-b50875ad3673": {
+    "user_id": "fc1581a3-4f0e-4882-8d4c-b50875ad3673",
+    "balance": 1250.75,
+    "available": 1250.75,
+    "pending": 0.0,
+    "currency": "BRL",
+    "created_at": "2025-08-06T21:55:57.284946",
+    "updated_at": "2025-08-27T21:55:57.284990"
+  },
+  "dea777fc-245d-4a3a-8b13-7b43894496ff": {
+    "user_id": "dea777fc-245d-4a3a-8b13-7b43894496ff",
+    "balance": 850.3,
+    "available": 850.3,
+    "pending": 0.0,
+    "currency": "BRL",
+    "created_at": "2025-08-12T21:55:57.285095",
+    "updated_at": "2025-08-27T21:55:57.285107"
+  },
+  "f8bdc3e3-e4f4-466a-b27a-51db4c7bba1d": {
+    "user_id": "f8bdc3e3-e4f4-466a-b27a-51db4c7bba1d",
+    "balance": 2100.5,
+    "available": 2100.5,
+    "pending": 0.0,
+    "currency": "BRL",
+    "created_at": "2025-08-05T21:55:57.285194",
+    "updated_at": "2025-08-27T21:55:57.285205"
+  },
+  "ea74e80e-c60f-40ec-a735-8efb10c96d3e": {
+    "user_id": "ea74e80e-c60f-40ec-a735-8efb10c96d3e",
+    "balance": 675.9,
+    "available": 675.9,
+    "pending": 0.0,
+    "currency": "BRL",
+    "created_at": "2025-07-28T21:55:57.285265",
+    "updated_at": "2025-08-27T21:55:57.285275"
+  },
+  "b635225c-146f-4539-a68e-60c5804082db": {
+    "user_id": "b635225c-146f-4539-a68e-60c5804082db",
+    "balance": 3200.25,
+    "available": 3200.25,
+    "pending": 0.0,
+    "currency": "BRL",
+    "created_at": "2025-08-05T21:55:57.285322",
+    "updated_at": "2025-08-27T21:55:57.285332"
+  },
+  "49c5fc6d-bc32-456a-96c4-2c192410f962": {
+    "user_id": "49c5fc6d-bc32-456a-96c4-2c192410f962",
+    "balance": 450.8,
+    "available": 450.8,
+    "pending": 0.0,
+    "currency": "BRL",
+    "created_at": "2025-08-07T21:55:57.285389",
+    "updated_at": "2025-08-27T21:55:57.285399"
+  },
+  "18335632-91a9-4219-b289-4e201a810f4d": {
+    "user_id": "18335632-91a9-4219-b289-4e201a810f4d",
+    "balance": 1800.15,
+    "available": 1800.15,
+    "pending": 0.0,
+    "currency": "BRL",
+    "created_at": "2025-08-19T21:55:57.285430",
+    "updated_at": "2025-08-27T21:55:57.285443"
+  },
+  "80c4627d-f38a-4302-997e-6ff4e150c874": {
+    "user_id": "80c4627d-f38a-4302-997e-6ff4e150c874",
+    "balance": 920.6,
+    "available": 920.6,
+    "pending": 0.0,
+    "currency": "BRL",
+    "created_at": "2025-08-18T21:55:57.285484",
+    "updated_at": "2025-08-27T21:55:57.285493"
+  },
+  "c2f3f210-4924-4f09-a456-61cfc433c443": {
+    "user_id": "c2f3f210-4924-4f09-a456-61cfc433c443",
+    "balance": 2750.4,
+    "available": 2750.4,
+    "pending": 0.0,
+    "currency": "BRL",
+    "created_at": "2025-08-26T21:55:57.285545",
+    "updated_at": "2025-08-27T21:55:57.285554"
+  },
+  "df031be3-12b5-4f00-b977-f37b0d4d0075": {
+    "user_id": "df031be3-12b5-4f00-b977-f37b0d4d0075",
+    "balance": 1350.95,
+    "available": 1350.95,
+    "pending": 0.0,
+    "currency": "BRL",
+    "created_at": "2025-08-10T21:55:57.285618",
+    "updated_at": "2025-08-27T21:55:57.285633"
+  }
+}

@@ -1,0 +1,199 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* BetFit Design System */
+:root {
+  /* BetFit Color Palette */
+  --betfit-dark: #0B0D0F;
+  --betfit-green: #2ECC71;
+  --betfit-yellow: #F2C94C;
+  --betfit-white: #FFFFFF;
+  --betfit-gray: #BFC5C9;
+  --betfit-red: #E74C3C;
+  
+  /* Radius */
+  --radius: 0.5rem;
+  
+  /* BetFit Theme Colors */
+  --background: var(--betfit-dark);
+  --foreground: var(--betfit-white);
+  --card: #1A1D21;
+  --card-foreground: var(--betfit-white);
+  --popover: #1A1D21;
+  --popover-foreground: var(--betfit-white);
+  --primary: var(--betfit-green);
+  --primary-foreground: var(--betfit-white);
+  --secondary: #2A2D31;
+  --secondary-foreground: var(--betfit-white);
+  --muted: #2A2D31;
+  --muted-foreground: var(--betfit-gray);
+  --accent: var(--betfit-yellow);
+  --accent-foreground: var(--betfit-dark);
+  --destructive: var(--betfit-red);
+  --destructive-foreground: var(--betfit-white);
+  --border: #3A3D41;
+  --input: #2A2D31;
+  --ring: var(--betfit-green);
+  
+  /* Chart colors */
+  --chart-1: var(--betfit-green);
+  --chart-2: var(--betfit-yellow);
+  --chart-3: #3498DB;
+  --chart-4: #9B59B6;
+  --chart-5: #E67E22;
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  }
+  
+  /* BetFit Typography */
+  h1 {
+    @apply text-4xl font-bold tracking-tight;
+  }
+  
+  h2 {
+    @apply text-3xl font-semibold tracking-tight;
+  }
+  
+  h3 {
+    @apply text-2xl font-semibold tracking-tight;
+  }
+  
+  h4 {
+    @apply text-xl font-semibold tracking-tight;
+  }
+  
+  /* BetFit Custom Classes */
+  .betfit-gradient {
+    background: linear-gradient(135deg, var(--betfit-green) 0%, var(--betfit-yellow) 100%);
+  }
+  
+  .betfit-card {
+    @apply bg-card border border-border rounded-lg p-6 shadow-lg;
+  }
+  
+  .betfit-button-primary {
+    @apply bg-primary hover:bg-primary/90 text-primary-foreground font-semibold py-3 px-6 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl;
+  }
+  
+  .betfit-button-secondary {
+    @apply bg-secondary hover:bg-secondary/90 text-secondary-foreground font-semibold py-3 px-6 rounded-lg transition-all duration-200;
+  }
+  
+  .betfit-odds-box {
+    @apply bg-card border border-border rounded-lg p-4 hover:border-primary/50 transition-all duration-200 cursor-pointer;
+  }
+  
+  .betfit-odds-box:hover {
+    @apply shadow-lg transform scale-105;
+  }
+  
+  .betfit-live-ticker {
+    @apply bg-secondary/50 border-y border-border py-2 overflow-hidden;
+  }
+  
+  .betfit-bet-slip {
+    @apply bg-card border border-border rounded-lg p-4 sticky top-4;
+  }
+  
+  /* Animations */
+  @keyframes pulse-green {
+    0%, 100% {
+      box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7);
+    }
+    50% {
+      box-shadow: 0 0 0 10px rgba(46, 204, 113, 0);
+    }
+  }
+  
+  .pulse-green {
+    animation: pulse-green 2s infinite;
+  }
+  
+  @keyframes slide-in {
+    from {
+      transform: translateX(-100%);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+  
+  .slide-in {
+    animation: slide-in 0.3s ease-out;
+  }
+  
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: var(--background);
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
+  }
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+  .betfit-odds-box:hover {
+    @apply transform-none scale-100;
+  }
+  
+  .betfit-button-primary,
+  .betfit-button-secondary {
+    @apply py-4 text-lg;
+    min-height: 44px;
+  }
+}
+

@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BetFit - Documentação Completa</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <i class="fas fa-trophy"></i>
+                <span>BetFit</span>
+                <small>Documentação</small>
+            </div>
+            <div class="header-controls">
+                <div class="search-box">
+                    <i class="fas fa-search"></i>
+                    <input type="text" placeholder="Buscar na documentação... (Ctrl+K)">
+                </div>
+                <button class="theme-toggle" title="Alternar tema (Ctrl+D)">
+                    <i class="fas fa-moon"></i>
+                </button>
+                <button class="menu-toggle" title="Menu">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <nav class="nav">
+                <!-- INÍCIO -->
+                <div class="nav-section">
+                    <h3><i class="fas fa-home"></i> INÍCIO</h3>
+                    <a href="#overview"><i class="fas fa-info-circle"></i> Visão Geral</a>
+                    <a href="#architecture"><i class="fas fa-sitemap"></i> Arquitetura</a>
+                    <a href="#features"><i class="fas fa-star"></i> Funcionalidades</a>
+                </div>
+
+                <!-- INSTALAÇÃO -->
+                <div class="nav-section">
+                    <h3><i class="fas fa-download"></i> INSTALAÇÃO</h3>
+                    <a href="#install-windows"><i class="fab fa-windows"></i> Windows 11</a>
+                    <a href="#install-vps"><i class="fas fa-server"></i> VPS/Servidor</a>
+                    <a href="#install-docker"><i class="fab fa-docker"></i> Docker</a>
+                    <a href="#troubleshooting"><i class="fas fa-tools"></i> Solução de Problemas</a>
+                </div>
+
+                <!-- DESENVOLVIMENTO -->
+                <div class="nav-section development">
+                    <h3><i class="fas fa-code"></i> DESENVOLVIMENTO</h3>
+                    <a href="#dashboard-dev"><i class="fas fa-chart-bar"></i> Dashboard & Métricas</a>
+                    <a href="#users-dev"><i class="fas fa-users"></i> Gestão de Usuários</a>
+                    <a href="#financial-dev"><i class="fas fa-wallet"></i> Sistema Financeiro</a>
+                    <a href="#challenges-dev"><i class="fas fa-trophy"></i> Desafios & Apostas</a>
+                    <a href="#admin-dev"><i class="fas fa-cog"></i> Painel Administrativo</a>
+                </div>
+
+                <!-- CONFIGURAÇÃO -->
+                <div class="nav-section">
+                    <h3><i class="fas fa-cogs"></i> CONFIGURAÇÃO</h3>
+                    <a href="#config-backend"><i class="fas fa-server"></i> Backend (Flask)</a>
+                    <a href="#config-frontend"><i class="fab fa-react"></i> Frontend (React)</a>
+                    <a href="#config-admin"><i class="fas fa-user-shield"></i> Painel Admin</a>
+                    <a href="#config-database"><i class="fas fa-database"></i> Banco de Dados</a>
+                </div>
+
+                <!-- API REFERENCE -->
+                <div class="nav-section">
+                    <h3><i class="fas fa-plug"></i> API REFERENCE</h3>
+                    <a href="#api-auth"><i class="fas fa-key"></i> Autenticação</a>
+                    <a href="#api-users"><i class="fas fa-user"></i> Usuários</a>
+                    <a href="#api-wallet"><i class="fas fa-credit-card"></i> Carteira</a>
+                    <a href="#api-challenges"><i class="fas fa-gamepad"></i> Desafios</a>
+                    <a href="#api-admin"><i class="fas fa-shield-alt"></i> Admin</a>
+                </div>
+
+                <!-- SUPORTE -->
+                <div class="nav-section">
+                    <h3><i class="fas fa-question-circle"></i> SUPORTE</h3>
+                    <a href="#faq"><i class="fas fa-question"></i> FAQ</a>
+                    <a href="#changelog"><i class="fas fa-history"></i> Changelog</a>
+                    <a href="#download"><i class="fas fa-download"></i> Download</a>
+                    <a href="#contact"><i class="fas fa-envelope"></i> Contato</a>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Visão Geral -->
+            <section id="overview" class="content-section active">
+                <div class="hero">
+                    <h1><i class="fas fa-trophy"></i> BetFit</h1>
+                    <p class="hero-subtitle">Plataforma de Apostas Fitness Gamificada</p>
+                    <div class="hero-badges">
+                        <span class="badge">React</span>
+                        <span class="badge">Flask</span>
+                        <span class="badge">Python</span>
+                        <span class="badge">JSON DB</span>
+                    </div>
+                </div>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <i class="fas fa-users"></i>
+                        <h3>Gestão de Usuários</h3>
+                        <p>Sistema completo de autenticação, perfis e KYC</p>
+                    </div>
+                    <div class="feature-card">
+                        <i class="fas fa-wallet"></i>
+                        <h3>Carteira Digital</h3>
+                        <p>Depósitos, saques e transações seguras</p>
+                    </div>
+                    <div class="feature-card">
+                        <i class="fas fa-trophy"></i>
+                        <h3>Desafios Fitness</h3>
+                        <p>6 desafios gamificados com apostas</p>
+                    </div>
+                    <div class="feature-card">
+                        <i class="fas fa-chart-bar"></i>
+                        <h3>Dashboard Admin</h3>
+                        <p>Métricas e gestão completa da plataforma</p>
+                    </div>
+                </div>
+
+                <div class="quick-start">
+                    <h2>🚀 Início Rápido</h2>
+                    <div class="code-block">
+                        <div class="code-header">
+                            <span><i class="fab fa-windows"></i> PowerShell</span>
+                            <button class="copy-btn" onclick="copyCode(this)" data-code="# 1. Extrair o sistema
+# Extrair BetFit-Sistema-Final.zip para D:\Sistemas\BetFit
+
+# 2. Executar instalação
+cd D:\Sistemas\BetFit
+.\scripts\install.ps1
+
+# 3. Iniciar sistema
+.\scripts\start.ps1
+
+# 4. Acessar aplicação
+# Frontend: http://localhost:3000
+# Admin: http://localhost:5174/">
+                                <i class="fas fa-copy"></i> Copiar
+                            </button>
+                        </div>
+                        <pre><code># 1. Extrair o sistema
+# Extrair BetFit-Sistema-Final.zip para D:\Sistemas\BetFit
+
+# 2. Executar instalação
+cd D:\Sistemas\BetFit
+.\scripts\install.ps1
+
+# 3. Iniciar sistema
+.\scripts\start.ps1
+
+# 4. Acessar aplicação
+# Frontend: http://localhost:3000
+# Admin: http://localhost:5174/</code></pre>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Arquitetura -->
+            <section id="architecture" class="content-section">
+                <h1><i class="fas fa-sitemap"></i> Arquitetura do Sistema</h1>
+                
+                <div class="architecture-diagram">
+                    <div class="arch-layer">
+                        <h3>Frontend (React)</h3>
+                        <div class="arch-components">
+                            <span>Interface Usuário</span>
+                            <span>Autenticação</span>
+                            <span>Carteira</span>
+                            <span>Desafios</span>
+                        </div>
+                    </div>
+                    <div class="arch-arrow">↓</div>
+                    <div class="arch-layer">
+                        <h3>Backend (Flask)</h3>
+                        <div class="arch-components">
+                            <span>API REST</span>
+                            <span>Autenticação JWT</span>
+                            <span>Lógica de Negócio</span>
+                            <span>Validações</span>
+                        </div>
+                    </div>
+                    <div class="arch-arrow">↓</div>
+                    <div class="arch-layer">
+                        <h3>Banco de Dados (JSON)</h3>
+                        <div class="arch-components">
+                            <span>users.json</span>
+                            <span>wallets.json</span>
+                            <span>transactions.json</span>
+                            <span>challenges.json</span>
+                        </div>
+                    </div>
+                </div>
+
+                <h2>📁 Estrutura de Pastas</h2>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span><i class="fas fa-folder-tree"></i> Estrutura do Projeto</span>
+                        <button class="copy-btn" onclick="copyCode(this)" data-code="BetFit/
+├── backend/                    # API Flask
+│   ├── src/
+│   │   └── main.py            # Aplicação principal
+│   ├── data/                  # Banco JSON
+│   │   ├── users.json
+│   │   ├── wallets.json
+│   │   └── transactions.json
+│   └── requirements.txt
+├── frontend/                  # Interface React
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   └── services/
+│   └── package.json
+├── admin/                     # Painel Admin
+│   ├── src/
+│   │   ├── components/
+│   │   └── pages/
+│   └── package.json
+├── docs/                      # Documentação
+│   ├── index.html
+│   └── guides/
+└── scripts/                   # Scripts PowerShell
+    ├── install.ps1
+    ├── start.ps1
+    └── stop.ps1">
+                            <i class="fas fa-copy"></i> Copiar
+                        </button>
+                    </div>
+                    <pre><code>BetFit/
+├── backend/                    # API Flask
+│   ├── src/
+│   │   └── main.py            # Aplicação principal
+│   ├── data/                  # Banco JSON
+│   │   ├── users.json
+│   │   ├── wallets.json
+│   │   └── transactions.json
+│   └── requirements.txt
+├── frontend/                  # Interface React
+│   ├── src/
+│   │   ├── components/
+│   │   ├── pages/
+│   │   └── services/
+│   └── package.json
+├── admin/                     # Painel Admin
+│   ├── src/
+│   │   ├── components/
+│   │   └── pages/
+│   └── package.json
+├── docs/                      # Documentação
+│   ├── index.html
+│   └── guides/
+└── scripts/                   # Scripts PowerShell
+    ├── install.ps1
+    ├── start.ps1
+    └── stop.ps1</code></pre>
+                </div>
+            </section>
+
+            <!-- Funcionalidades -->
+            <section id="features" class="content-section">
+                <h1><i class="fas fa-star"></i> Funcionalidades</h1>
+                
+                <div class="features-grid">
+                    <div class="feature-detail">
+                        <h3><i class="fas fa-user-plus"></i> Autenticação</h3>
+                        <ul>
+                            <li>Registro de usuários</li>
+                            <li>Login com JWT</li>
+                            <li>Verificação KYC</li>
+                            <li>Recuperação de senha</li>
+                        </ul>
+                    </div>
+                    <div class="feature-detail">
+                        <h3><i class="fas fa-credit-card"></i> Sistema Financeiro</h3>
+                        <ul>
+                            <li>Carteira digital</li>
+                            <li>Depósitos PIX/Cartão</li>
+                            <li>Saques automáticos</li>
+                            <li>Histórico de transações</li>
+                        </ul>
+                    </div>
+                    <div class="feature-detail">
+                        <h3><i class="fas fa-gamepad"></i> Desafios</h3>
+                        <ul>
+                            <li>6 desafios fitness</li>
+                            <li>Sistema de apostas</li>
+                            <li>Distribuição de prêmios</li>
+                            <li>Ranking de usuários</li>
+                        </ul>
+                    </div>
+                    <div class="feature-detail">
+                        <h3><i class="fas fa-chart-line"></i> Analytics</h3>
+                        <ul>
+                            <li>Dashboard em tempo real</li>
+                            <li>Métricas de usuários</li>
+                            <li>Relatórios financeiros</li>
+                            <li>Logs de auditoria</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Instalação Windows -->
+            <section id="install-windows" class="content-section">
+                <h1><i class="fab fa-windows"></i> Instalação Windows 11</h1>
+                
+                <div class="install-steps">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h3>Download do Sistema</h3>
+                            <p>Baixe o arquivo <code>BetFit-Sistema-Final.zip</code> e extraia para:</p>
+                            <div class="code-block">
+                                <div class="code-header">
+                                    <span><i class="fas fa-folder"></i> Caminho de Instalação</span>
+                                    <button class="copy-btn" onclick="copyCode(this)" data-code="D:\Sistemas\BetFit\">
+                                        <i class="fas fa-copy"></i> Copiar
+                                    </button>
+                                </div>
+                                <pre><code>D:\Sistemas\BetFit\</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h3>Executar Instalação</h3>
+                            <p>Abra PowerShell como Administrador e execute:</p>
+                            <div class="code-block">
+                                <div class="code-header">
+                                    <span><i class="fab fa-windows"></i> PowerShell (Admin)</span>
+                                    <button class="copy-btn" onclick="copyCode(this)" data-code="cd D:\Sistemas\BetFit
+.\scripts\install.ps1">
+                                        <i class="fas fa-copy"></i> Copiar
+                                    </button>
+                                </div>
+                                <pre><code>cd D:\Sistemas\BetFit
+.\scripts\install.ps1</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h3>Iniciar Sistema</h3>
+                            <p>Execute o script de inicialização:</p>
+                            <div class="code-block">
+                                <div class="code-header">
+                                    <span><i class="fab fa-windows"></i> PowerShell</span>
+                                    <button class="copy-btn" onclick="copyCode(this)" data-code=".\scripts\start.ps1">
+                                        <i class="fas fa-copy"></i> Copiar
+                                    </button>
+                                </div>
+                                <pre><code>.\scripts\start.ps1</code></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <h3>Acessar Aplicação</h3>
+                            <p>O sistema abrirá automaticamente nos seguintes endereços:</p>
+                            <ul>
+                                <li><strong>Frontend:</strong> <a href="http://localhost:3000" target="_blank">http://localhost:3000</a></li>
+                                <li><strong>Admin:</strong> <a href="http://localhost:5174/" target="_blank">http://localhost:5174/</a></li>
+                                <li><strong>API:</strong> <a href="http://localhost:5001" target="_blank">http://localhost:5001</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="requirements">
+                    <h2>📋 Requisitos do Sistema</h2>
+                    <ul>
+                        <li><strong>OS:</strong> Windows 11 (recomendado)</li>
+                        <li><strong>Python:</strong> 3.8+ (instalado automaticamente)</li>
+                        <li><strong>Node.js:</strong> 18+ (instalado automaticamente)</li>
+                        <li><strong>RAM:</strong> 4GB mínimo</li>
+                        <li><strong>Espaço:</strong> 2GB livres</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- Dashboard & Métricas -->
+            <section id="dashboard-dev" class="content-section">
+                <h1><i class="fas fa-chart-bar"></i> Dashboard & Métricas</h1>
+                
+                <h2>📊 Componentes do Dashboard</h2>
+                <p>O dashboard é composto por vários componentes que exibem métricas em tempo real.</p>
+
+                <h3>🔧 Arquivos Principais</h3>
+                <div class="file-list">
+                    <div class="file-item">
+                        <i class="fas fa-file-code"></i>
+                        <span><code>admin/src/pages/DashboardPage.jsx</code></span>
+                        <small>Página principal do dashboard</small>
+                    </div>
+                    <div class="file-item">
+                        <i class="fas fa-file-code"></i>
+                        <span><code>backend/src/main.py</code></span>
+                        <small>API de métricas (rota /api/admin/dashboard)</small>
+                    </div>
+                </div>
+
+                <h3>📈 Adicionando Nova Métrica</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span><i class="fab fa-react"></i> admin/src/pages/DashboardPage.jsx</span>
+                        <button class="copy-btn" onclick="copyCode(this)" data-code="// 1. Adicionar estado para nova métrica
+const [newMetric, setNewMetric] = useState(0);
+
+// 2. Buscar dados da API
+useEffect(() => {
+  const fetchMetrics = async () => {
+    const response = await fetch('/api/admin/dashboard');
+    const data = await response.json();
+    setNewMetric(data.new_metric);
+  };
+  fetchMetrics();
+}, []);
+
+// 3. Adicionar card da métrica
+<div className=\"metric-card\">
+  <div className=\"metric-icon\">
+    <i className=\"fas fa-chart-line\"></i>
+  </div>
+  <div className=\"metric-content\">
+    <h3>Nova Métrica</h3>
+    <div className=\"metric-value\">{newMetric}</div>
+  </div>
+</div>">
+                            <i class="fas fa-copy"></i> Copiar
+                        </button>
+                    </div>
+                    <pre><code>// 1. Adicionar estado para nova métrica
+const [newMetric, setNewMetric] = useState(0);
+
+// 2. Buscar dados da API
+useEffect(() => {
+  const fetchMetrics = async () => {
+    const response = await fetch('/api/admin/dashboard');
+    const data = await response.json();
+    setNewMetric(data.new_metric);
+  };
+  fetchMetrics();
+}, []);
+
+// 3. Adicionar card da métrica
+&lt;div className="metric-card"&gt;
+  &lt;div className="metric-icon"&gt;
+    &lt;i className="fas fa-chart-line"&gt;&lt;/i&gt;
+  &lt;/div&gt;
+  &lt;div className="metric-content"&gt;
+    &lt;h3&gt;Nova Métrica&lt;/h3&gt;
+    &lt;div className="metric-value"&gt;{newMetric}&lt;/div&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+                </div>
+
+                <h3>🔄 Atualizando API Backend</h3>
+                <div class="code-block">
+                    <div class="code-header">
+                        <span><i class="fab fa-python"></i> backend/src/main.py</span>
+                        <button class="copy-btn" onclick="copyCode(this)" data-code="# Adicionar cálculo da nova métrica na rota dashboard
+@app.route('/api/admin/dashboard', methods=['GET'])
+def get_dashboard_metrics():
+    # ... código existente ...
+    
+    # Nova métrica
+    new_metric = calculate_new_metric()
+    
+    return jsonify({
+        # ... métricas existentes ...
+        'new_metric': new_metric
+    })
+
+def calculate_new_metric():
+    # Implementar lógica da nova métrica
+    return len(users_db) * 2  # Exemplo">
+                            <i class="fas fa-copy"></i> Copiar
+                        </button>
+                    </div>
+                    <pre><code># Adicionar cálculo da nova métrica na rota dashboard
+@app.route('/api/admin/dashboard', methods=['GET'])
+def get_dashboard_metrics():
+    # ... código existente ...
+    
+    # Nova métrica
+    new_metric = calculate_new_metric()
+    
+    return jsonify({
+        # ... métricas existentes ...
+        'new_metric': new_metric
+    })
+
+def calculate_new_metric():
+    # Implementar lógica da nova métrica
+    return len(users_db) * 2  # Exemplo</code></pre>
+                </div>
+
+                <h3>📊 Tipos de Gráficos Disponíveis</h3>
+                <ul>
+                    <li><strong>Line Chart:</strong> Para tendências temporais</li>
+                    <li><strong>Bar Chart:</strong> Para comparações</li>
+                    <li><strong>Pie Chart:</strong> Para distribuições</li>
+                    <li><strong>Area Chart:</strong> Para volumes acumulados</li>
+                </ul>
+            </section>
+
+            <!-- Download -->
+            <section id="download" class="content-section">
+                <h1><i class="fas fa-download"></i> Download do Sistema</h1>
+                
+                <div class="download-hero">
+                    <h2>🎉 BetFit Sistema Completo</h2>
+                    <p>Baixe o sistema completo otimizado para Windows 11</p>
+                    
+                    <div class="download-stats">
+                        <div class="stat">
+                            <i class="fas fa-file-archive"></i>
+                            <span>910 KB</span>
+                            <small>Tamanho otimizado</small>
+                        </div>
+                        <div class="stat">
+                            <i class="fas fa-code"></i>
+                            <span>3 Apps</span>
+                            <small>Frontend + Admin + Backend</small>
+                        </div>
+                        <div class="stat">
+                            <i class="fas fa-users"></i>
+                            <span>11 Usuários</span>
+                            <small>Dados de exemplo</small>
+                        </div>
+                    </div>
+                    
+                    <div class="download-buttons">
+                        <a href="/home/ubuntu/BetFit-Sistema-Final.zip" download class="download-btn primary">
+                            <i class="fas fa-download"></i>
+                            Download Sistema Completo
+                            <small>BetFit-Sistema-Final.zip</small>
+                        </a>
+                    </div>
+                </div>
+
+                <h2>📦 Conteúdo do Pacote</h2>
+                <div class="package-contents">
+                    <div class="content-section">
+                        <h3><i class="fas fa-server"></i> Backend</h3>
+                        <ul>
+                            <li>API Flask completa</li>
+                            <li>Banco de dados JSON</li>
+                            <li>11 usuários fake com saldos</li>
+                            <li>Sistema de autenticação JWT</li>
+                            <li>APIs de carteira e desafios</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="content-section">
+                        <h3><i class="fab fa-react"></i> Frontend</h3>
+                        <ul>
+                            <li>Interface React moderna</li>
+                            <li>6 desafios fitness</li>
+                            <li>Sistema de carteira</li>
+                            <li>Autenticação completa</li>
+                            <li>Design responsivo</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="content-section">
+                        <h3><i class="fas fa-cog"></i> Painel Admin</h3>
+                        <ul>
+                            <li>Dashboard com métricas reais</li>
+                            <li>Gestão de usuários</li>
+                            <li>Relatórios financeiros</li>
+                            <li>Configurações do sistema</li>
+                            <li>Logs de auditoria</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="content-section">
+                        <h3><i class="fas fa-book"></i> Documentação</h3>
+                        <ul>
+                            <li>Guias de instalação</li>
+                            <li>Tutoriais de desenvolvimento</li>
+                            <li>Referência da API</li>
+                            <li>Exemplos de código</li>
+                            <li>Solução de problemas</li>
+                        </ul>
+                    </div>
+                </div>
+            </section>
+
+            <!-- FAQ -->
+            <section id="faq" class="content-section">
+                <h1><i class="fas fa-question"></i> FAQ - Perguntas Frequentes</h1>
+                
+                <div class="faq-grid">
+                    <div class="faq-item">
+                        <h3>❓ Como instalar o sistema?</h3>
+                        <p>Extraia o arquivo ZIP para <code>D:\Sistemas\BetFit</code> e execute <code>.\scripts\install.ps1</code> como administrador.</p>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <h3>🔧 O sistema não inicia, o que fazer?</h3>
+                        <p>Verifique se Python e Node.js estão instalados. Execute <code>.\scripts\install.ps1</code> novamente para instalar dependências.</p>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <h3>💰 Como adicionar saldo aos usuários?</h3>
+                        <p>Use o painel administrativo em <code>http://localhost:5174/</code>, vá em "Usuários" e clique em "Adicionar Saldo".</p>
+                    </div>
+                    
+                    <div class="faq-item">
+                        <h3>🎮 Como criar novos desafios?</h3>
+                        <p>Edite o arquivo <code>backend/data/challenges.json</code> e adicione um novo objeto com a estrutura dos desafios existentes.</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Contato -->
+            <section id="contact" class="content-section">
+                <h1><i class="fas fa-envelope"></i> Contato</h1>
+                
+                <div class="contact-grid">
+                    <div class="contact-card">
+                        <i class="fas fa-code"></i>
+                        <h3>Desenvolvimento</h3>
+                        <p>Para questões técnicas e desenvolvimento</p>
+                        <a href="mailto:dev@betfit.com">dev@betfit.com</a>
+                    </div>
+                    
+                    <div class="contact-card">
+                        <i class="fas fa-life-ring"></i>
+                        <h3>Suporte</h3>
+                        <p>Ajuda com instalação e configuração</p>
+                        <a href="mailto:suporte@betfit.com">suporte@betfit.com</a>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        // Função para copiar código
+        function copyCode(button) {
+            const code = button.getAttribute('data-code');
+            navigator.clipboard.writeText(code).then(function() {
+                // Feedback visual
+                const originalText = button.innerHTML;
+                button.innerHTML = '<i class="fas fa-check"></i> Copiado!';
+                button.style.background = 'var(--success-color)';
+                
+                setTimeout(() => {
+                    button.innerHTML = originalText;
+                    button.style.background = '';
+                }, 2000);
+            }).catch(function(err) {
+                console.error('Erro ao copiar: ', err);
+                // Fallback para navegadores mais antigos
+                const textArea = document.createElement('textarea');
+                textArea.value = code;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                const originalText = button.innerHTML;
+                button.innerHTML = '<i class="fas fa-check"></i> Copiado!';
+                button.style.background = 'var(--success-color)';
+                
+                setTimeout(() => {
+                    button.innerHTML = originalText;
+                    button.style.background = '';
+                }, 2000);
+            });
+        }
+
+        // Navegação entre seções
+        function showSection(sectionId) {
+            // Esconder todas as seções
+            const sections = document.querySelectorAll('.content-section');
+            sections.forEach(section => section.classList.remove('active'));
+            
+            // Mostrar seção selecionada
+            const targetSection = document.getElementById(sectionId);
+            if (targetSection) {
+                targetSection.classList.add('active');
+            }
+            
+            // Atualizar links ativos na sidebar
+            const links = document.querySelectorAll('.nav a');
+            links.forEach(link => link.classList.remove('active'));
+            
+            const activeLink = document.querySelector(`a[href="#${sectionId}"]`);
+            if (activeLink) {
+                activeLink.classList.add('active');
+            }
+        }
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', function() {
+            // Mostrar seção overview por padrão
+            showSection('overview');
+            
+            // Adicionar event listeners para navegação
+            const navLinks = document.querySelectorAll('.nav a');
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const sectionId = this.getAttribute('href').substring(1);
+                    showSection(sectionId);
+                });
+            });
+        });
+    </script>
+</body>
+</html>
+

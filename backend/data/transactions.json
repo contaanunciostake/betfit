@@ -1,0 +1,474 @@
+{
+  "3e00c833-8752-492b-aebc-38472a1450ad": [
+    {
+      "id": "75e9d133-f5ca-4a78-a4ee-63696419b2e9",
+      "user_id": "3e00c833-8752-492b-aebc-38472a1450ad",
+      "type": "admin_credit",
+      "amount": 100.5,
+      "description": "Crédito adicionado pelo administrador",
+      "status": "completed",
+      "created_at": "2025-08-27T21:50:07.120257"
+    }
+  ],
+  "fc1581a3-4f0e-4882-8d4c-b50875ad3673": [
+    {
+      "id": "59e9469f-70aa-4e2e-a8fb-9f3ce478af98",
+      "user_id": "fc1581a3-4f0e-4882-8d4c-b50875ad3673",
+      "type": "deposit",
+      "amount": 1250.75,
+      "description": "Depósito inicial via PIX",
+      "status": "completed",
+      "created_at": "2025-08-06T21:55:57.284946"
+    },
+    {
+      "id": "f686eabd-c2c9-465b-b9ee-33ec035ebd07",
+      "user_id": "fc1581a3-4f0e-4882-8d4c-b50875ad3673",
+      "type": "deposit",
+      "amount": 43.88775089908553,
+      "description": "Depósito via Cartão de Crédito",
+      "status": "completed",
+      "created_at": "2025-08-12T21:55:57.285013"
+    },
+    {
+      "id": "67870380-8f94-4ba6-b9f7-b6cdb62f5c47",
+      "user_id": "fc1581a3-4f0e-4882-8d4c-b50875ad3673",
+      "type": "bet",
+      "amount": -40.76856114521205,
+      "description": "Aposta no desafio Caminhada 10k",
+      "status": "completed",
+      "created_at": "2025-08-17T21:55:57.285031"
+    },
+    {
+      "id": "a8fe317e-34bc-4408-9098-84c62c487a9d",
+      "user_id": "fc1581a3-4f0e-4882-8d4c-b50875ad3673",
+      "type": "win",
+      "amount": 101.02062951267177,
+      "description": "Prêmio do desafio Caminhada 10k",
+      "status": "completed",
+      "created_at": "2025-08-14T21:55:57.285041"
+    },
+    {
+      "id": "b9b0060b-597a-4055-aa2a-3c347985f433",
+      "user_id": "fc1581a3-4f0e-4882-8d4c-b50875ad3673",
+      "type": "deposit",
+      "amount": 156.34224517878351,
+      "description": "Depósito via PIX",
+      "status": "completed",
+      "created_at": "2025-08-14T21:55:57.285054"
+    },
+    {
+      "id": "ef5b84ac-a610-4b0b-ad5f-db5e10430473",
+      "user_id": "fc1581a3-4f0e-4882-8d4c-b50875ad3673",
+      "type": "deposit",
+      "amount": 154.85360100091742,
+      "description": "Depósito via PIX",
+      "status": "completed",
+      "created_at": "2025-08-18T21:55:57.285063"
+    }
+  ],
+  "dea777fc-245d-4a3a-8b13-7b43894496ff": [
+    {
+      "id": "6e032913-729c-4f8d-bfdd-6dcb2616143d",
+      "user_id": "dea777fc-245d-4a3a-8b13-7b43894496ff",
+      "type": "deposit",
+      "amount": 850.3,
+      "description": "Depósito inicial via PIX",
+      "status": "completed",
+      "created_at": "2025-08-12T21:55:57.285095"
+    },
+    {
+      "id": "8b0bd0ff-8953-4de6-80f2-09139c7c3adb",
+      "user_id": "dea777fc-245d-4a3a-8b13-7b43894496ff",
+      "type": "win",
+      "amount": 63.940022313750525,
+      "description": "Prêmio do desafio Caminhada 10k",
+      "status": "completed",
+      "created_at": "2025-08-22T21:55:57.285120"
+    },
+    {
+      "id": "b8a1916f-8ffd-4cb8-9057-4ac432cf9de9",
+      "user_id": "dea777fc-245d-4a3a-8b13-7b43894496ff",
+      "type": "deposit",
+      "amount": 144.265466511151,
+      "description": "Depósito via Cartão de Crédito",
+      "status": "completed",
+      "created_at": "2025-08-17T21:55:57.285146"
+    },
+    {
+      "id": "1cd97823-e685-4ed5-a861-817c5d0ff4f2",
+      "user_id": "dea777fc-245d-4a3a-8b13-7b43894496ff",
+      "type": "deposit",
+      "amount": 52.39787324457598,
+      "description": "Depósito via PIX",
+      "status": "completed",
+      "created_at": "2025-08-19T21:55:57.285155"
+    },
+    {
+      "id": "62c5684b-561d-4aea-9065-e0092fa1cb9a",
+      "user_id": "dea777fc-245d-4a3a-8b13-7b43894496ff",
+      "type": "bet",
+      "amount": -87.91045025672146,
+      "description": "Aposta no desafio Corrida 5km",
+      "status": "completed",
+      "created_at": "2025-08-14T21:55:57.285163"
+    },
+    {
+      "id": "cb0c2199-b27d-4934-bf25-0c32caaa0717",
+      "user_id": "dea777fc-245d-4a3a-8b13-7b43894496ff",
+      "type": "win",
+      "amount": 123.80911469392443,
+      "description": "Prêmio do desafio Corrida 5km",
+      "status": "completed",
+      "created_at": "2025-08-20T21:55:57.285171"
+    }
+  ],
+  "f8bdc3e3-e4f4-466a-b27a-51db4c7bba1d": [
+    {
+      "id": "069d0f4f-5938-4770-b558-1588f5495637",
+      "user_id": "f8bdc3e3-e4f4-466a-b27a-51db4c7bba1d",
+      "type": "deposit",
+      "amount": 2100.5,
+      "description": "Depósito inicial via PIX",
+      "status": "completed",
+      "created_at": "2025-08-05T21:55:57.285194"
+    },
+    {
+      "id": "32ed13e5-24ed-4711-8608-2b480072ab93",
+      "user_id": "f8bdc3e3-e4f4-466a-b27a-51db4c7bba1d",
+      "type": "win",
+      "amount": 72.2456660006067,
+      "description": "Prêmio do desafio Caminhada 10k",
+      "status": "completed",
+      "created_at": "2025-08-12T21:55:57.285218"
+    },
+    {
+      "id": "ab3c391a-2f76-405b-bbb0-8e220f14e5f4",
+      "user_id": "f8bdc3e3-e4f4-466a-b27a-51db4c7bba1d",
+      "type": "deposit",
+      "amount": 43.98319789314506,
+      "description": "Depósito via Cartão de Crédito",
+      "status": "completed",
+      "created_at": "2025-08-19T21:55:57.285225"
+    },
+    {
+      "id": "44402668-45a3-4f56-b5e7-462f3d5922a3",
+      "user_id": "f8bdc3e3-e4f4-466a-b27a-51db4c7bba1d",
+      "type": "bet",
+      "amount": -98.38683664025305,
+      "description": "Aposta no desafio Corrida 5km",
+      "status": "completed",
+      "created_at": "2025-08-21T21:55:57.285232"
+    },
+    {
+      "id": "78abe92f-b567-498c-9733-879547772b82",
+      "user_id": "f8bdc3e3-e4f4-466a-b27a-51db4c7bba1d",
+      "type": "win",
+      "amount": 56.04701678231513,
+      "description": "Prêmio do desafio Ciclismo 20km",
+      "status": "completed",
+      "created_at": "2025-08-14T21:55:57.285240"
+    },
+    {
+      "id": "39e3b27e-ce36-40c2-8363-d86b2798edcc",
+      "user_id": "f8bdc3e3-e4f4-466a-b27a-51db4c7bba1d",
+      "type": "deposit",
+      "amount": 45.05352918866444,
+      "description": "Depósito via PIX",
+      "status": "completed",
+      "created_at": "2025-08-24T21:55:57.285247"
+    }
+  ],
+  "ea74e80e-c60f-40ec-a735-8efb10c96d3e": [
+    {
+      "id": "7f2d2107-de43-408e-ac1a-1e5115a5f688",
+      "user_id": "ea74e80e-c60f-40ec-a735-8efb10c96d3e",
+      "type": "deposit",
+      "amount": 675.9,
+      "description": "Depósito inicial via PIX",
+      "status": "completed",
+      "created_at": "2025-07-28T21:55:57.285265"
+    },
+    {
+      "id": "7979712d-b314-4e86-9311-efee2bfec626",
+      "user_id": "ea74e80e-c60f-40ec-a735-8efb10c96d3e",
+      "type": "win",
+      "amount": 16.617863639427235,
+      "description": "Prêmio do desafio Ciclismo 20km",
+      "status": "completed",
+      "created_at": "2025-08-20T21:55:57.285285"
+    },
+    {
+      "id": "40afe7c1-2fdf-4cb7-b5d5-ca26711c18ba",
+      "user_id": "ea74e80e-c60f-40ec-a735-8efb10c96d3e",
+      "type": "win",
+      "amount": 179.83195632945265,
+      "description": "Prêmio do desafio Corrida 5km",
+      "status": "completed",
+      "created_at": "2025-08-14T21:55:57.285292"
+    },
+    {
+      "id": "6622427c-c99d-42fd-80af-ffe7b128a183",
+      "user_id": "ea74e80e-c60f-40ec-a735-8efb10c96d3e",
+      "type": "win",
+      "amount": 143.36657915255188,
+      "description": "Prêmio do desafio Caminhada 10k",
+      "status": "completed",
+      "created_at": "2025-08-26T21:55:57.285298"
+    },
+    {
+      "id": "d69d643e-2ace-4822-8062-e7ba51dfa445",
+      "user_id": "ea74e80e-c60f-40ec-a735-8efb10c96d3e",
+      "type": "deposit",
+      "amount": 153.27042006542544,
+      "description": "Depósito via PIX",
+      "status": "completed",
+      "created_at": "2025-08-19T21:55:57.285305"
+    }
+  ],
+  "b635225c-146f-4539-a68e-60c5804082db": [
+    {
+      "id": "29386067-fd66-40d2-9df8-b05ee023094f",
+      "user_id": "b635225c-146f-4539-a68e-60c5804082db",
+      "type": "deposit",
+      "amount": 3200.25,
+      "description": "Depósito inicial via PIX",
+      "status": "completed",
+      "created_at": "2025-08-05T21:55:57.285322"
+    },
+    {
+      "id": "9c4bfe59-bc01-475e-a7f8-9f7aad175210",
+      "user_id": "b635225c-146f-4539-a68e-60c5804082db",
+      "type": "bet",
+      "amount": -105.56552673594642,
+      "description": "Aposta no desafio Caminhada 10k",
+      "status": "completed",
+      "created_at": "2025-08-13T21:55:57.285343"
+    },
+    {
+      "id": "57712f71-a129-46bf-91dd-48ee963acaff",
+      "user_id": "b635225c-146f-4539-a68e-60c5804082db",
+      "type": "deposit",
+      "amount": 101.99110824244633,
+      "description": "Depósito via Cartão de Crédito",
+      "status": "completed",
+      "created_at": "2025-08-17T21:55:57.285349"
+    },
+    {
+      "id": "7dd0a799-b46f-49ff-ab0e-fa7289836484",
+      "user_id": "b635225c-146f-4539-a68e-60c5804082db",
+      "type": "deposit",
+      "amount": 148.06448823343402,
+      "description": "Depósito via PIX",
+      "status": "completed",
+      "created_at": "2025-08-24T21:55:57.285356"
+    },
+    {
+      "id": "0b9673dc-7b95-49ae-bc3b-eb80c1619311",
+      "user_id": "b635225c-146f-4539-a68e-60c5804082db",
+      "type": "win",
+      "amount": 15.636228501003565,
+      "description": "Prêmio do desafio Ciclismo 20km",
+      "status": "completed",
+      "created_at": "2025-08-21T21:55:57.285363"
+    }
+  ],
+  "49c5fc6d-bc32-456a-96c4-2c192410f962": [
+    {
+      "id": "1ed825e6-6cc6-4993-b5cf-cf7615631d58",
+      "user_id": "49c5fc6d-bc32-456a-96c4-2c192410f962",
+      "type": "deposit",
+      "amount": 450.8,
+      "description": "Depósito inicial via PIX",
+      "status": "completed",
+      "created_at": "2025-08-07T21:55:57.285389"
+    },
+    {
+      "id": "a14618e0-4c10-4e6b-a02b-d811292e5878",
+      "user_id": "49c5fc6d-bc32-456a-96c4-2c192410f962",
+      "type": "deposit",
+      "amount": 187.7871327575061,
+      "description": "Depósito via Cartão de Crédito",
+      "status": "completed",
+      "created_at": "2025-08-12T21:55:57.285409"
+    },
+    {
+      "id": "4f1fbf8e-b8c3-44c0-a9dd-a7a1774e4a75",
+      "user_id": "49c5fc6d-bc32-456a-96c4-2c192410f962",
+      "type": "bet",
+      "amount": -126.23924513082368,
+      "description": "Aposta no desafio Caminhada 10k",
+      "status": "completed",
+      "created_at": "2025-08-22T21:55:57.285415"
+    }
+  ],
+  "18335632-91a9-4219-b289-4e201a810f4d": [
+    {
+      "id": "eb7e282f-15ee-4bb0-ab18-143d057521cf",
+      "user_id": "18335632-91a9-4219-b289-4e201a810f4d",
+      "type": "deposit",
+      "amount": 1800.15,
+      "description": "Depósito inicial via PIX",
+      "status": "completed",
+      "created_at": "2025-08-19T21:55:57.285430"
+    },
+    {
+      "id": "d12abbd7-568d-4c8b-b3fa-1e00db0a913d",
+      "user_id": "18335632-91a9-4219-b289-4e201a810f4d",
+      "type": "bet",
+      "amount": -189.8742742312811,
+      "description": "Aposta no desafio Caminhada 10k",
+      "status": "completed",
+      "created_at": "2025-08-20T21:55:57.285455"
+    },
+    {
+      "id": "a843121b-ed0f-4b38-af43-598c46ab0365",
+      "user_id": "18335632-91a9-4219-b289-4e201a810f4d",
+      "type": "deposit",
+      "amount": 57.62508920591869,
+      "description": "Depósito via Cartão de Crédito",
+      "status": "completed",
+      "created_at": "2025-08-15T21:55:57.285462"
+    },
+    {
+      "id": "63b6d530-1abf-4c56-9f0b-aad9560c62bf",
+      "user_id": "18335632-91a9-4219-b289-4e201a810f4d",
+      "type": "win",
+      "amount": 107.96449630264871,
+      "description": "Prêmio do desafio Corrida 5km",
+      "status": "completed",
+      "created_at": "2025-08-23T21:55:57.285468"
+    }
+  ],
+  "80c4627d-f38a-4302-997e-6ff4e150c874": [
+    {
+      "id": "9e76d4b9-07a0-4b62-bfb5-24467434a48d",
+      "user_id": "80c4627d-f38a-4302-997e-6ff4e150c874",
+      "type": "deposit",
+      "amount": 920.6,
+      "description": "Depósito inicial via PIX",
+      "status": "completed",
+      "created_at": "2025-08-18T21:55:57.285484"
+    },
+    {
+      "id": "57df6025-368c-4db9-894b-3148c8fef34c",
+      "user_id": "80c4627d-f38a-4302-997e-6ff4e150c874",
+      "type": "bet",
+      "amount": -145.94666300247377,
+      "description": "Aposta no desafio Caminhada 10k",
+      "status": "completed",
+      "created_at": "2025-08-20T21:55:57.285504"
+    },
+    {
+      "id": "519f7762-5b4a-43de-8ab5-93af30a106cf",
+      "user_id": "80c4627d-f38a-4302-997e-6ff4e150c874",
+      "type": "bet",
+      "amount": -147.6185039276323,
+      "description": "Aposta no desafio Ciclismo 20km",
+      "status": "completed",
+      "created_at": "2025-08-16T21:55:57.285510"
+    },
+    {
+      "id": "635093b6-070c-40a7-acba-dd0697f50113",
+      "user_id": "80c4627d-f38a-4302-997e-6ff4e150c874",
+      "type": "deposit",
+      "amount": 49.702251273141975,
+      "description": "Depósito via Cartão de Crédito",
+      "status": "completed",
+      "created_at": "2025-08-13T21:55:57.285517"
+    },
+    {
+      "id": "f8d5abb8-8bb8-4b85-9e42-65b03ce4c32a",
+      "user_id": "80c4627d-f38a-4302-997e-6ff4e150c874",
+      "type": "win",
+      "amount": 26.408442578870797,
+      "description": "Prêmio do desafio Caminhada 10k",
+      "status": "completed",
+      "created_at": "2025-08-18T21:55:57.285523"
+    },
+    {
+      "id": "ea0317f1-6c16-4eb7-8343-89b5339d46a3",
+      "user_id": "80c4627d-f38a-4302-997e-6ff4e150c874",
+      "type": "win",
+      "amount": 77.09069341723857,
+      "description": "Prêmio do desafio Ciclismo 20km",
+      "status": "completed",
+      "created_at": "2025-08-22T21:55:57.285530"
+    }
+  ],
+  "c2f3f210-4924-4f09-a456-61cfc433c443": [
+    {
+      "id": "671531e4-8ce7-4962-a610-74bb89d179b8",
+      "user_id": "c2f3f210-4924-4f09-a456-61cfc433c443",
+      "type": "deposit",
+      "amount": 2750.4,
+      "description": "Depósito inicial via PIX",
+      "status": "completed",
+      "created_at": "2025-08-26T21:55:57.285545"
+    },
+    {
+      "id": "2af3ac27-1d22-4aff-8f73-4b22ceef85df",
+      "user_id": "c2f3f210-4924-4f09-a456-61cfc433c443",
+      "type": "win",
+      "amount": 122.1399767932314,
+      "description": "Prêmio do desafio Ciclismo 20km",
+      "status": "completed",
+      "created_at": "2025-08-18T21:55:57.285563"
+    },
+    {
+      "id": "008a71ff-24c3-45af-a4c1-a4f1f4357010",
+      "user_id": "c2f3f210-4924-4f09-a456-61cfc433c443",
+      "type": "deposit",
+      "amount": 56.93926729623874,
+      "description": "Depósito via PIX",
+      "status": "completed",
+      "created_at": "2025-08-20T21:55:57.285571"
+    },
+    {
+      "id": "71362603-963e-40b2-a059-b59dc014577d",
+      "user_id": "c2f3f210-4924-4f09-a456-61cfc433c443",
+      "type": "win",
+      "amount": 23.635568746995524,
+      "description": "Prêmio do desafio Ciclismo 20km",
+      "status": "completed",
+      "created_at": "2025-08-23T21:55:57.285579"
+    },
+    {
+      "id": "1490fccc-8cc4-4358-bd50-83e632966fa2",
+      "user_id": "c2f3f210-4924-4f09-a456-61cfc433c443",
+      "type": "win",
+      "amount": 159.58175839129086,
+      "description": "Prêmio do desafio Caminhada 10k",
+      "status": "completed",
+      "created_at": "2025-08-24T21:55:57.285589"
+    }
+  ],
+  "df031be3-12b5-4f00-b977-f37b0d4d0075": [
+    {
+      "id": "ef1416aa-9b69-44ba-9629-d225a5d3a78d",
+      "user_id": "df031be3-12b5-4f00-b977-f37b0d4d0075",
+      "type": "deposit",
+      "amount": 1350.95,
+      "description": "Depósito inicial via PIX",
+      "status": "completed",
+      "created_at": "2025-08-10T21:55:57.285618"
+    },
+    {
+      "id": "d0afe936-eaff-4e3a-8393-97591d3b8fb8",
+      "user_id": "df031be3-12b5-4f00-b977-f37b0d4d0075",
+      "type": "bet",
+      "amount": -147.2489614194485,
+      "description": "Aposta no desafio Ciclismo 20km",
+      "status": "completed",
+      "created_at": "2025-08-19T21:55:57.285646"
+    },
+    {
+      "id": "02921f7a-ea33-46d6-8f8f-647614752b1c",
+      "user_id": "df031be3-12b5-4f00-b977-f37b0d4d0075",
+      "type": "bet",
+      "amount": -81.94041882421075,
+      "description": "Aposta no desafio Caminhada 10k",
+      "status": "completed",
+      "created_at": "2025-08-24T21:55:57.285654"
+    }
+  ]
+}
