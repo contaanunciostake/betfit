@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configurar DATABASE_PATH com .env
-DATABASE_URL=postgresql://betfit_user:MO7JTjCxfDlzoGGcAfOLfWkiF9axsiw9@dpg-d3a7vke3jp1c73cqsup0-a.oregon-postgres.render.com/betfit
+DATABASE_PATH = os.getenv('DATABASE_PATH', './betfit.db')
 
 #!/usr/bin/env python3
 import hashlib
