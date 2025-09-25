@@ -202,7 +202,8 @@ export function ChallengeProvider({ children }) {
       // <<< LOG 1: VERIFICA SE A FUNÇÃO É CHAMADA >>>
       console.log(`1. [CONTEXT] INICIANDO busca de participações para: ${userEmail}`);
       
-      const response = await fetch(`http://localhost:5001/api/challenges/my-participations?user_email=${userEmail}`);
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://betfit-backend.onrender.com';
+      const response = await fetch(`${API_BASE_URL}/api/challenges/my-participations?user_email=${userEmail}`);
       const data = await response.json();
       
       // <<< LOG 2: VERIFICA O QUE A API RETORNOU >>>
