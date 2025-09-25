@@ -1,4 +1,5 @@
 # MODELOS ATUALIZADOS COM INTEGRAÇÃO FITNESS - HealthKit e Health Connect + MÚLTIPLOS VENCEDORES
+# CORREÇÃO: is_active agora é Boolean
 
 from sqlalchemy import create_engine, Column, String, Float, Integer, DateTime, Text, ForeignKey, Boolean
 from sqlalchemy.ext.declarative import declarative_base
@@ -336,7 +337,9 @@ class ChallengeWinner(Base):
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
-# Demais modelos existentes (sem alteração)
+# =====================================================================
+# CORREÇÃO PRINCIPAL: ChallengeCategory com is_active como Boolean
+# =====================================================================
 class ChallengeCategory(Base):
     __tablename__ = 'challenge_categories'
     
@@ -345,7 +348,7 @@ class ChallengeCategory(Base):
     description = Column(Text, nullable=True)
     icon = Column(String, nullable=True)
     color = Column(String, nullable=True)
-    is_active = Column(String, default='true')
+    is_active = Column(Boolean, default=True)  # ✅ CORRIGIDO: Boolean ao invés de String
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
     
@@ -356,7 +359,7 @@ class ChallengeCategory(Base):
             'description': self.description,
             'icon': self.icon,
             'color': self.color,
-            'is_active': self.is_active,
+            'is_active': self.is_active,  # ✅ Agora retorna True/False
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
@@ -437,7 +440,7 @@ class GlobalActivity(Base):
     challenge_id = Column(String, nullable=True)
     amount = Column(Float, nullable=True)
     extra_data = Column(Text, nullable=True)
-    is_public = Column(String, default='true')
+    is_public = Column(String, default='true')  # Mantido como String por compatibilidade
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     
     def to_dict(self):
@@ -453,7 +456,7 @@ class GlobalActivity(Base):
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
-    # Configuração do banco - PostgreSQL em produção, SQLite em desenvolvimento
+# Configuração do banco - PostgreSQL em produção, SQLite em desenvolvimento
 DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///c:/Temp/BetFit/backend/src/betfit.db')
 
 if DATABASE_URL.startswith('postgresql'):
@@ -468,17 +471,13 @@ SessionLocal = sessionmaker(bind=engine)
 # Criar todas as tabelas
 Base.metadata.create_all(engine)
 
-print("✅ Modelos atualizados com integração fitness + MÚLTIPLOS VENCEDORES!")
-print("📊 NOVAS TABELAS PARA FITNESS:")
-print("   - fitness_connections (conexões com apps de fitness)")
-print("   - fitness_data (dados de fitness recebidos)")
-print("   - challenge_validations (validações automáticas)")
-print("   - challenge_winners (registro de vencedores)")
-print("🏆 NOVOS CAMPOS PARA MÚLTIPLOS VENCEDORES:")
-print("   - Challenge: max_winners, winner_selection_type, prize_distribution_type")
-print("   - ChallengeParticipation: final_position, is_winner")
-print("   - ChallengeWinner: nova tabela para histórico de vencedores")
-print("🔧 MELHORIAS NOS MODELOS EXISTENTES:")
-print("   - Challenge: campos para validação automática")
-print("   - User: relacionamentos com fitness")
-print("💾 Banco de dados: c:/Temp/BetFit/backend/src/betfit.db")
+print("✅ Modelos corrigidos - is_active agora é Boolean!")
+print("📊 CORREÇÃO APLICADA:")
+print("   - ChallengeCategory.is_active: String -> Boolean")
+print("   - FitnessConnection.is_active: já era Boolean")
+print("   - ChallengeParticipation.is_winner: Boolean")
+print("🏆 RECURSOS MANTIDOS:")
+print("   - Múltiplos vencedores")
+print("   - Integração fitness")
+print("   - Validação automática")
+print("💾 Banco: PostgreSQL (produção) | SQLite (desenvolvimento)")
