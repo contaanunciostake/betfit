@@ -520,7 +520,16 @@ const loadCategoriesFromDatabase = async () => {
   // Filter challenges by category and status
   const filteredChallenges = () => {
   const challengesToUse = realChallenges.length > 0 ? realChallenges : contextChallenges;
-  if (!challengesToUse) return [];
+  
+  // Debug: Ver dados de entrada
+  console.log('🔍 [FILTER DEBUG] challengesToUse:', challengesToUse);
+  console.log('🔍 [FILTER DEBUG] selectedCategory:', selectedCategory);
+  console.log('🔍 [FILTER DEBUG] activeTab:', activeTab);
+  
+  if (!challengesToUse || challengesToUse.length === 0) {
+    console.log('❌ [FILTER DEBUG] Nenhum desafio disponível');
+    return [];
+  }
   
   // First filter by category
   let filtered = challengesToUse;
@@ -528,6 +537,8 @@ const loadCategoriesFromDatabase = async () => {
     filtered = challengesToUse.filter(challenge => {
       const challengeCategory = (challenge.category || challenge.category_name || '').toLowerCase();
       const selectedCategoryLower = selectedCategory.toLowerCase();
+      
+      console.log(`🔍 [CATEGORY DEBUG] Comparando "${challengeCategory}" com "${selectedCategoryLower}"`);
       
       if (challengeCategory === selectedCategoryLower) return true;
       
@@ -542,56 +553,78 @@ const loadCategoriesFromDatabase = async () => {
       };
       
       for (const [key, alternatives] of Object.entries(categoryMappings)) {
-        if (selectedCategoryLower === key && alternatives.includes(challengeCategory)) return true;
-        if (alternatives.includes(selectedCategoryLower) && challengeCategory === key) return true;
+        if (selectedCategoryLower === key && alternatives.includes(challengeCategory)) {
+          console.log(`✅ [CATEGORY DEBUG] Match encontrado: ${key} -> ${challengeCategory}`);
+          return true;
+        }
+        if (alternatives.includes(selectedCategoryLower) && challengeCategory === key) {
+          console.log(`✅ [CATEGORY DEBUG] Match reverso encontrado: ${challengeCategory} -> ${selectedCategoryLower}`);
+          return true;
+        }
       }
       
+      console.log(`❌ [CATEGORY DEBUG] Sem match para: ${challengeCategory}`);
       return false;
     });
   }
-
-    // Then filter by status/tab
-    return filtered.filter(challenge => {
+  
+  console.log('🔍 [FILTER DEBUG] Após filtro de categoria:', filtered);
+  
+  // Then filter by status/tab
+  const result = filtered.filter(challenge => {
     const status = challenge.status || 'active';
+    console.log(`🔍 [STATUS DEBUG] Desafio: ${challenge.title}, Status: ${status}, Tab: ${activeTab}`);
     
     switch (activeTab) {
       case 'available':
-        // INCLUIR tanto 'active' quanto 'pending' (agendados)
-        return status === 'active' || status === 'pending';
+        const isAvailable = status === 'active' || status === 'pending';
+        console.log(`🔍 [STATUS DEBUG] Is available: ${isAvailable}`);
+        return isAvailable;
         
       case 'my_active':
-        // Show only challenges the user is actively participating in
-        return isUserParticipating(challenge.id);
+        const isUserActive = isUserParticipating(challenge.id);
+        console.log(`🔍 [STATUS DEBUG] User participating: ${isUserActive}`);
+        return isUserActive;
         
       default:
-        // INCLUIR tanto 'active' quanto 'pending' por padrão
-        return status === 'active' || status === 'pending';
+        const isDefault = status === 'active' || status === 'pending';
+        console.log(`🔍 [STATUS DEBUG] Default case: ${isDefault}`);
+        return isDefault;
     }
   });
+  
+  console.log('✅ [FILTER DEBUG] Resultado final:', result);
+  return result;
 };
-
 
   // Get challenge counts for each tab
  const getChallengeStats = () => {
   const challengesToUse = realChallenges.length > 0 ? realChallenges : contextChallenges;
+  
+  console.log('📊 [STATS DEBUG] challengesToUse:', challengesToUse);
+  
   if (!challengesToUse) return { available: 0, my_active: 0 };
   
   let available = 0, my_active = 0;
   
   challengesToUse.forEach(challenge => {
     const status = challenge.status || 'active';
+    console.log(`📊 [STATS DEBUG] Desafio: ${challenge.title}, Status: ${status}`);
     
     // Count user's active challenges
     if (isUserParticipating(challenge.id)) {
       my_active++;
+      console.log(`📊 [STATS DEBUG] User participating +1`);
     }
     
     // Count available challenges (INCLUIR PENDING)
     if (status === 'active' || status === 'pending') {
       available++;
+      console.log(`📊 [STATS DEBUG] Available +1`);
     }
   });
   
+  console.log('📊 [STATS DEBUG] Final stats:', { available, my_active });
   return { available, my_active };
 };
   
