@@ -381,7 +381,7 @@ const LandingPage = () => {
             </p>
           </div>
         </div>
-      </section>
+      </footer>
 
       {/* Login Modal */}
       <LoginModal 
