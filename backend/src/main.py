@@ -2877,7 +2877,7 @@ def create_challenge():
         category_id = int(data['category_id'])
         category_query = session.execute(text('''
             SELECT id, name FROM challenge_categories 
-            WHERE id = :category_id AND is_active = 1
+            WHERE id = :category_id AND is_active = '1'
         '''), {"category_id": category_id})
         
         category_result = category_query.fetchone()
@@ -4455,7 +4455,7 @@ def activate_category(category_id):
         # Reativar categoria (1)
         cursor.execute('''
             UPDATE challenge_categories 
-            SET is_active = 1, updated_at = datetime('now')
+            SET is_active = '1', updated_at = datetime('now')
             WHERE id = ?
         ''', (category_id,))
         
@@ -5318,7 +5318,7 @@ def get_payment_settings():
                 ps.environment
             FROM payment_webhooks pw
             JOIN payment_settings ps ON pw.payment_setting_id = ps.id
-            WHERE pw.is_active = 1
+            WHERE pw.is_active = '1'
         """)
         
         webhooks_rows = cursor.fetchall()
