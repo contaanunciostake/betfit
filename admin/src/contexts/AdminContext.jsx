@@ -16,7 +16,7 @@ export const AdminProvider = ({ children }) => {
   const [error, setError] = useState('')
 
   // Configuração da API - Localhost como padrão
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001'
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://betfit-backend.onrender.com'
 
   // Função genérica para chamadas da API - Melhorada e robusta
   const apiCall = async (endpoint, options = {}) => {
