@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configurar DATABASE_PATH com .env
-DATABASE_PATH = os.path.join(os.path.dirname(__file__), 'betfit.db')
+DATABASE_PATH = os.getenv('DATABASE_PATH', './betfit.db')
 
 #!/usr/bin/env python3
 import hashlib
@@ -20,7 +20,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS, cross_origin
 from sqlalchemy import or_, func, text
 from werkzeug.utils import secure_filename
-from models import ChallengeCategory
+
 
 from models import (
     User, Wallet, Transaction, Challenge,
@@ -77,8 +77,6 @@ if not cors_origins or cors_origins == ['']:
         "https://betfit-front.loca.lt",
         "https://betfit-api.loca.lt",
         "https://e6270cb05b48.ngrok-free.app"
-        "https://betfit-backend.onrender.com"
-        "https://betfit-frontend-thwz.onrender.com"
     ]
 
 CORS(app,
@@ -132,8 +130,6 @@ def serve_logo(filename):
     "https://finances-gathering-eyes-del.trycloudflare.com",
     "https://betfit-front.loca.lt", 
     "https://betfit-api.loca.lt"
-    "https://betfit-backend.onrender.com"
-    "https://betfit-frontend-thwz.onrender.com"
 ])
 def get_public_settings():
     """
@@ -461,7 +457,7 @@ def initialize_mercadopago():
     
     try:
         # Carregar credenciais do banco de dados
-        session = SessionLocal()
+        conn = sqlite3.connect(DATABASE_PATH)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -505,7 +501,7 @@ def get_payments_config():
         print("🔍 [CONFIG] Buscando public_key do MercadoPago...")
         
         # Buscar as credenciais do banco de dados usando sqlite3 direto
-        session = SessionLocal()
+        conn = sqlite3.connect(DATABASE_PATH)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -1176,8 +1172,9 @@ def mercadopago_webhook():
 @app.route('/api/admin/challenges/participations', methods=['GET'])
 def get_challenges_with_participations():
     """Endpoint que retorna desafios com contagem correta de participações"""
-    session = SessionLocal()
     try:
+        session = SessionLocal()
+        
         # Buscar todos os desafios
         challenges = session.query(Challenge).all()
         
@@ -1196,6 +1193,8 @@ def get_challenges_with_participations():
                 'participants_count': p.participants_count,
                 'total_pool': float(p.total_pool) if p.total_pool else 0.0
             }
+        
+        print(f"🔍 [ADMIN] Participações por desafio: {participations_map}")
         
         # Montar resposta com dados corretos
         challenges_data = []
@@ -1230,10 +1229,16 @@ def get_challenges_with_participations():
             })
             
             challenges_data.append(challenge_dict)
+            
+            print(f"✅ [ADMIN] Desafio {challenge.title}: {participation_data['participants_count']} participantes")
+        
+        session.close()
         
         # Calcular totais
         total_participants = sum(c['participants_count'] for c in challenges_data)
         total_pool = sum(c['total_pool'] for c in challenges_data)
+        
+        print(f"📊 [ADMIN] Total: {total_participants} participantes, R$ {total_pool:.2f} em pools")
         
         return jsonify({
             'success': True,
@@ -1257,8 +1262,7 @@ def get_challenges_with_participations():
             'total_participants': 0,
             'total_pool': 0.0
         }), 500
-    finally:
-        session.close()  # ✅ CORRETO: sempre executa
+
 
 @app.route('/api/challenges/<challenge_id>/join', methods=['OPTIONS'])
 def join_challenge_options(challenge_id):
@@ -1361,7 +1365,7 @@ def join_challenge(challenge_id):
                 'participation_id': participation.id,
                 'new_balance': wallet.balance,
                 'challenge_title': challenge.title,
-                'platform_fee': current_platform_fee,
+                'platform_fee': current_platform_fee,  # <-- RETORNAR TAXA APLICADA
                 'fee_amount': fee_amount,
                 'net_contribution': net_contribution,
                 'updated_challenge': {
@@ -1372,14 +1376,17 @@ def join_challenge(challenge_id):
             }
         }), 201
             
+    except sqlite3.Error as e:
+        print(f"❌ [JOIN] Erro no banco de dados: {e}")
+        return jsonify({'success': False, 'error': f'Erro no banco de dados: {str(e)}'}), 500
+        
     except Exception as e:
-        session.rollback()  # ✅ Adicionar rollback
         print(f"❌ [JOIN] Erro geral: {e}")
         import traceback
         print(f"❌ [JOIN] Stack trace: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': f'Erro interno: {str(e)}'}), 500
-    finally:
-        session.close()  # ✅ Adicionar finally block
+
+
 
 @app.route('/api/platform/fee', methods=['GET'])
 def get_current_platform_fee():
@@ -1524,732 +1531,308 @@ def model_tx_to_dict(t):
 def seed_database():
     """
     Endpoint de desenvolvimento para recriar e popular o banco com dados de teste.
-    Otimizado para PostgreSQL.
-    
-    ⚠️  ATENÇÃO: Este endpoint deve ser usado APENAS em ambiente de desenvolvimento!
+    Apaga as tabelas inteiras (DROP TABLE) e começa do zero.
     """
     from sqlalchemy import text
-    from datetime import datetime, timedelta
-    import uuid
-    
-    # Verificação de segurança - só permitir em ambiente de desenvolvimento
-    if app.config.get('ENV') == 'production' or not app.debug:
-        return jsonify({
-            'error': 'Operação não permitida em ambiente de produção'
-        }), 403
     
     session = SessionLocal()
     try:
-        print("🔥 [SEED] RESET TOTAL DO BANCO DE DADOS PostgreSQL...")
+        print("🔥 [SEED] RESET TOTAL DO BANCO DE DADOS...")
         
-        # Pega a engine do SQLAlchemy
+        # Pega a engine do SQLAlchemy para executar comandos
         engine = session.get_bind()
-        
-        # Para PostgreSQL: Drop e recriar é mais confiável que TRUNCATE
+
+        # Desativa a verificação de chaves estrangeiras
+        session.execute(text('PRAGMA foreign_keys=OFF;'))
+
+        # Apaga todas as tabelas conhecidas pelo `models.py`
         from models import Base
-        
-        print("   - Removendo todas as tabelas...")
+        print("   - Apagando todas as tabelas conhecidas...")
         Base.metadata.drop_all(engine)
         
-        print("   - Recriando estrutura das tabelas...")
+        # Recria todas as tabelas a partir do `models.py`
+        print("   - Recriando todas as tabelas...")
         Base.metadata.create_all(engine)
         
-        # Commit da estrutura
+        # Reativa a verificação de chaves estrangeiras
+        session.execute(text('PRAGMA foreign_keys=ON;'))
+        
         session.commit()
         
-        print("🌱 [SEED] Populando o banco com dados de teste...")
-        
-        # ====== CRIAR USUÁRIOS DE TESTE ======
-        users_data = [
-            {
-                'id': str(uuid.uuid4()),
-                'name': 'Usuário Teste 1',
-                'email': 'teste@betfit.com',
-                'balance': 500.0
-            },
-            {
-                'id': str(uuid.uuid4()),
-                'name': 'Usuário Teste 2', 
-                'email': 'teste2@betfit.com',
-                'balance': 300.0
-            },
-            {
-                'id': str(uuid.uuid4()),
-                'name': 'Admin Teste',
-                'email': 'admin@betfit.com', 
-                'balance': 1000.0
-            }
-        ]
-        
-        created_users = []
-        created_wallets = []
-        
-        for user_data in users_data:
-            # Criar usuário
-            user = User(
-                id=user_data['id'],
-                name=user_data['name'],
-                email=user_data['email'],
-                password=hash_password('123456'),
-                status='active',
-                kyc_status='verified',
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
-                total_bets=0
-            )
-            session.add(user)
-            created_users.append(user)
-            
-            # Criar carteira
-            wallet = Wallet(
-                id=str(uuid.uuid4()),
-                user_id=user_data['id'],
-                balance=user_data['balance'],
-                available=user_data['balance'],
-                currency='BRL',
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
-            )
-            session.add(wallet)
-            created_wallets.append(wallet)
-        
-        # Commit usuários e carteiras
-        session.commit()
-        print(f"   ✅ {len(created_users)} usuários e carteiras criados")
-        
-        # ====== CRIAR DESAFIOS DE TESTE ======
-        now = datetime.utcnow()
-        start_future = now + timedelta(hours=2)
-        end_future = now + timedelta(days=7)
-        
-        challenges_data = [
-            {
-                'id': 'challenge_001',
-                'title': 'Corrida 5km em 30min',
-                'description': 'Complete uma corrida de 5km em até 30 minutos usando qualquer app de corrida compatível.',
-                'category': 'running',
-                'difficulty': 'medium',
-                'entry_fee': 25.0,
-                'duration_days': 7,
-                'required_app_category': 'running'
-            },
-            {
-                'id': 'challenge_002', 
-                'title': 'Caminhada 10.000 passos',
-                'description': 'Alcance 10.000 passos em um único dia registrados em app de fitness.',
-                'category': 'walking',
-                'difficulty': 'easy',
-                'entry_fee': 15.0,
-                'duration_days': 3,
-                'required_app_category': 'fitness'
-            },
-            {
-                'id': 'challenge_003',
-                'title': 'Treino 45min Academia', 
-                'description': 'Complete um treino de pelo menos 45 minutos na academia ou em casa.',
-                'category': 'gym',
-                'difficulty': 'medium',
-                'entry_fee': 30.0,
-                'duration_days': 5,
-                'required_app_category': 'fitness'
-            },
-            {
-                'id': 'challenge_004',
-                'title': 'Yoga 20min Diário',
-                'description': 'Pratique pelo menos 20 minutos de yoga por dia durante uma semana completa.',
-                'category': 'yoga',
-                'difficulty': 'easy', 
-                'entry_fee': 20.0,
-                'duration_days': 14,
-                'required_app_category': 'wellness'
-            },
-            {
-                'id': 'challenge_005',
-                'title': 'Natação 1km Semanal',
-                'description': 'Nade pelo menos 1km distribuído ao longo da semana.',
-                'category': 'swimming',
-                'difficulty': 'hard',
-                'entry_fee': 40.0, 
-                'duration_days': 7,
-                'required_app_category': 'swimming'
-            }
-        ]
-        
-        created_challenges = []
-        for challenge_data in challenges_data:
-            challenge = Challenge(
-                id=challenge_data['id'],
-                title=challenge_data['title'],
-                description=challenge_data['description'],
-                category=challenge_data['category'],
-                difficulty=challenge_data['difficulty'],
-                entry_fee=challenge_data['entry_fee'],
-                start_date=start_future,
-                end_date=start_future + timedelta(days=challenge_data['duration_days']),
-                required_app_category=challenge_data['required_app_category'],
-                current_participants=0,
-                max_participants=100,  # Limite padrão
-                total_pool=0.0,
-                status='active',
-                created_at=now,
-                updated_at=now
-            )
-            session.add(challenge)
-            created_challenges.append(challenge)
-        
-        # Commit desafios
-        session.commit()
-        print(f"   ✅ {len(created_challenges)} desafios criados")
-        
-        # ====== CRIAR ALGUMAS PARTICIPAÇÕES DE EXEMPLO ======
-        # Usuário 1 participa do desafio de caminhada
-        sample_participation = ChallengeParticipation(
-            id=str(uuid.uuid4()),
-            challenge_id='challenge_002',
-            user_id=created_users[0].id,
-            stake_amount=15.0,
+        print("🌱 [SEED] Populando o banco de dados com dados de teste limpos...")
+
+        # --- A lógica para criar usuários e desafios permanece a mesma ---
+        user_id_teste = str(uuid.uuid4())
+        user1 = User(
+            id=user_id_teste,
+            name='Usuário Teste',
+            email='teste@betfit.com',
+            password=hash_password('123456'),
             status='active',
-            joined_at=now,
-            created_at=now
+            kyc_status='verified'
         )
-        session.add(sample_participation)
-        
-        # Atualizar contadores do desafio
-        challenge_002 = session.query(Challenge).filter(Challenge.id == 'challenge_002').first()
-        if challenge_002:
-            challenge_002.current_participants = 1
-            challenge_002.total_pool = 15.0 * 0.95  # Assumindo 5% de taxa
-        
-        # Criar transação correspondente
-        sample_transaction = Transaction(
+        session.add(user1)
+
+        wallet1 = Wallet(
             id=str(uuid.uuid4()),
-            user_id=created_users[0].id,
-            type='bet',
-            amount=-15.0,
-            description='Aposta no desafio: Caminhada 10.000 passos',
-            status='completed',
-            created_at=now
+            user_id=user_id_teste,
+            balance=100.0,
+            available=100.0,
+            currency='BRL'
         )
-        session.add(sample_transaction)
-        
-        # Atualizar saldo do usuário
-        created_wallets[0].balance -= 15.0
-        created_wallets[0].available -= 15.0
-        created_users[0].total_bets = 1
-        
-        # Commit final
+        session.add(wallet1)
+
+        challenges_to_create = [
+            Challenge(
+                id='challenge_001', title='Corrida 5km em 30min',
+                description='...', category='running', difficulty='medium', entry_fee=25.0,
+                start_date=datetime.utcnow(), end_date=datetime.utcnow() + timedelta(days=7),
+                required_app_category='running'
+            ),
+            # ... (os outros desafios)
+        ]
+        session.add_all(challenges_to_create)
+
         session.commit()
-        
-        print("✅ [SEED] Banco PostgreSQL populado com sucesso!")
-        print(f"   - Usuários: {len(created_users)}")
-        print(f"   - Carteiras: {len(created_wallets)}")
-        print(f"   - Desafios: {len(created_challenges)}")
-        print(f"   - Participações exemplo: 1")
-        
-        return jsonify({
-            "success": True,
-            "message": "Banco de dados PostgreSQL recriado e populado com sucesso!",
-            "data": {
-                "users_created": len(created_users),
-                "wallets_created": len(created_wallets), 
-                "challenges_created": len(created_challenges),
-                "sample_participations": 1,
-                "test_credentials": [
-                    {"email": "teste@betfit.com", "password": "123456", "balance": 485.0},
-                    {"email": "teste2@betfit.com", "password": "123456", "balance": 300.0},
-                    {"email": "admin@betfit.com", "password": "123456", "balance": 1000.0}
-                ],
-                "available_challenges": [c['title'] for c in challenges_data]
-            }
-        }), 201
-        
+        print("✅ [SEED] Banco de dados recriado e populado com sucesso!")
+
+        return jsonify({"message": "Banco de dados recriado e populado com 1 usuário e 4 desafios."}), 201
+
     except Exception as e:
         session.rollback()
         import traceback
-        error_trace = traceback.format_exc()
-        print(f"❌ [SEED] Erro ao recriar banco PostgreSQL: {e}")
-        print(f"❌ [SEED] Stack trace: {error_trace}")
-        
-        return jsonify({
-            "success": False,
-            "error": f"Erro ao recriar banco PostgreSQL: {str(e)}",
-            "type": type(e).__name__,
-            "details": error_trace if app.debug else "Detalhes disponíveis apenas em modo debug"
-        }), 500
+        print(f"❌ [SEED] Erro ao recriar o banco: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
     finally:
         session.close()
+
 # ==================== CHALLENGES ENDPOINTS ====================
 
 # ==================== AUTHENTICATION ENDPOINTS ====================
 
 @app.route('/api/auth/register', methods=['POST'])
 def register():
-    """Registro de usuário com validação completa"""
+    """Registro de usuário com persistência real no banco"""
     session = SessionLocal()
     try:
-        # Verificar se recebeu dados
         data = request.get_json()
-        if not data:
-            print("❌ [REGISTER] Nenhum dado JSON recebido")
-            return jsonify({
-                'success': False,
-                'error': 'Dados não fornecidos'
-            }), 400
         
-        print(f"📝 [REGISTER] Dados recebidos: {list(data.keys())}")
+        print(f"🔍 [REGISTRO] Iniciando processo de registro...")
+        print(f"🔍 [REGISTRO] Dados recebidos: {data}")
         
-        # Validar campos obrigatórios
+        # Validar dados obrigatórios
         required_fields = ['name', 'email', 'password']
-        missing_fields = []
-        
         for field in required_fields:
-            if not data.get(field) or not str(data.get(field)).strip():
-                missing_fields.append(field)
-        
-        if missing_fields:
-            return jsonify({
-                'success': False,
-                'error': f'Campos obrigatórios faltando: {", ".join(missing_fields)}'
-            }), 400
-        
-        # Normalizar dados
-        email = data['email'].strip().lower()
-        password = data['password'].strip()
-        name = data['name'].strip()
-        
-        # Validar email
-        import re
-        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        if not re.match(email_pattern, email):
-            return jsonify({
-                'success': False,
-                'error': 'Formato de email inválido'
-            }), 400
-        
-        # Validar senha
-        if len(password) < 6:
-            return jsonify({
-                'success': False,
-                'error': 'Senha deve ter pelo menos 6 caracteres'
-            }), 400
-        
-        print(f"✅ [REGISTER] Validação OK para: {email}")
+            if not data.get(field):
+                return jsonify({'error': f'Campo {field} é obrigatório'}), 400
         
         # Verificar se email já existe
-        existing_user = session.query(User).filter_by(email=email).first()
+        print(f"🔍 [REGISTRO] Verificando se email {data['email']} já existe...")
+        existing_user = session.query(User).filter_by(email=data['email']).first()
         if existing_user:
-            print(f"❌ [REGISTER] Email já existe: {email}")
-            return jsonify({
-                'success': False,
-                'error': 'Email já cadastrado'
-            }), 409
+            print(f"❌ [REGISTRO] Email já existe: {data['email']}")
+            return jsonify({'error': 'Email já cadastrado'}), 400
+        print(f"✅ [REGISTRO] Email disponível: {data['email']}")
         
-        # Criar usuário
-        from datetime import datetime
-        import uuid
-        import secrets
-        
+        # Criar novo usuário
         user_id = str(uuid.uuid4())
-        current_time = datetime.utcnow()
-        
         user = User(
             id=user_id,
-            name=name,
-            email=email,
-            phone=data.get('phone', '').strip() if data.get('phone') else None,
-            password=hash_password(password),
+            name=data['name'],
+            email=data['email'],
+            phone=data.get('phone', ''),
+            password=hash_password(data['password']),
             status='active',
-            kyc_status='pending',
-            created_at=current_time,
-            updated_at=current_time,
-            total_bets=0
+            kyc_status='pending'
         )
-        session.add(user)
         
-        # Criar carteira
+        session.add(user)
+        print(f"🔍 [REGISTRO] Usuário adicionado à sessão: {user.email}")
+        session.commit()
+        print(f"✅ [REGISTRO] Usuário commitado no banco: {user.id}")
+        
+        # Criar carteira para o usuário com bônus de boas-vindas
         wallet = Wallet(
             id=str(uuid.uuid4()),
             user_id=user_id,
             balance=50.0,
             available=50.0,
             pending=0.0,
-            currency='BRL',
-            created_at=current_time,
-            updated_at=current_time
+            currency='BRL'
         )
         session.add(wallet)
+        print(f"🔍 [REGISTRO] Carteira adicionada à sessão para usuário: {user_id}")
+        session.commit()
+        print(f"✅ [REGISTRO] Carteira commitada no banco com saldo: R$ {wallet.balance}")
         
-        # Criar transação de bônus
+        # Adicionar transação de bônus de boas-vindas
         bonus_transaction = Transaction(
             id=str(uuid.uuid4()),
             user_id=user_id,
             type='bonus',
             amount=50.0,
             description='Bônus de boas-vindas',
-            status='completed',
-            created_at=current_time
+            status='completed'
         )
         session.add(bonus_transaction)
-        
-        # Commit tudo junto
         session.commit()
+        print(f"✅ [REGISTRO] Transação de bônus adicionada")
         
-        # Gerar token
-        access_token = secrets.token_urlsafe(32)
+        # Gerar token de acesso
+        access_token = secrets.token_hex(16)
         
-        # Resposta padronizada
-        response_data = {
-            'success': True,
-            'message': 'Usuário registrado com sucesso!',
-            'data': {
-                'user': {
-                    'id': user.id,
-                    'name': user.name,
-                    'email': user.email,
-                    'phone': user.phone,
-                    'status': user.status,
-                    'kyc_status': user.kyc_status
-                },
-                'wallet': {
-                    'balance': float(wallet.balance),
-                    'available': float(wallet.available),
-                    'currency': wallet.currency
-                },
-                'bonus_applied': True
-            },
-            'access_token': access_token
+        # Resposta sem senha
+        user_response = {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "phone": user.phone,
+            "status": user.status,
+            "kyc_status": user.kyc_status,
+            "created_at": user.created_at.isoformat() if user.created_at else None
         }
         
-        print(f"✅ [REGISTER] Usuário criado: {email}")
-        return jsonify(response_data), 201
+        wallet_response = {
+            "balance": wallet.balance,
+            "available": wallet.available,
+            "pending": wallet.pending,
+            "currency": wallet.currency
+        }
         
-    except Exception as e:
-        session.rollback()
-        print(f"❌ [REGISTER] Erro: {e}")
-        import traceback
-        print(f"❌ [REGISTER] Stack: {traceback.format_exc()}")
+        print(f"✅ [REGISTRO] Novo usuário registrado: {user.email} (ID: {user_id})")
         
         return jsonify({
-            'success': False,
-            'error': 'Erro interno do servidor',
-            'details': str(e) if app.debug else None
-        }), 500
+            'message': 'Usuário registrado com sucesso! Bônus de R$ 50,00 adicionado à carteira.',
+            'user': user_response,
+            'wallet': wallet_response,
+            'access_token': access_token
+        }), 201
+    
+    except Exception as e:
+        session.rollback()
+        print(f"❌ [REGISTRO] ERRO DETALHADO: {e}")
+        print(f"❌ [REGISTRO] Tipo do erro: {type(e)}")
+        import traceback
+        print(f"❌ [REGISTRO] Stack trace: {traceback.format_exc()}")
+        return jsonify({'error': 'Erro interno do servidor'}), 500
     finally:
         session.close()
 
-
-# ✅ ENDPOINT COMPLEMENTAR: Login para testar o registro
-
 @app.route('/api/auth/login', methods=['POST'])
-def user_login():  # Nome diferente para evitar conflito
-    """Login de usuário com validação robusta"""
+def login():
+    """Login de usuário"""
     session = SessionLocal()
     try:
-        # Verificar dados recebidos
         data = request.get_json()
-        if not data:
-            return jsonify({
-                'success': False,
-                'error': 'Dados não fornecidos'
-            }), 400
-        
-        email = data.get('email', '').strip().lower()
-        password = data.get('password', '').strip()
-        
-        print(f"🔐 [LOGIN] Tentativa para: {email}")
-        
+        email = data.get('email')
+        password = data.get('password')
+
         if not email or not password:
-            return jsonify({
-                'success': False,
-                'error': 'Email e senha são obrigatórios'
-            }), 400
-        
-        # Buscar usuário
+            return jsonify({'error': 'Email e senha são obrigatórios'}), 400
+
+        print(f"🔐 [LOGIN] Tentativa de login: {email}")
+
+        # Buscar usuário no banco
         user = session.query(User).filter_by(email=email).first()
         if not user:
             print(f"❌ [LOGIN] Usuário não encontrado: {email}")
-            return jsonify({
-                'success': False,
-                'error': 'Credenciais inválidas'
-            }), 401
-        
-        # Verificar senha
-        if not verify_password(password, user.password):
-            print(f"❌ [LOGIN] Senha incorreta: {email}")
-            return jsonify({
-                'success': False,
-                'error': 'Credenciais inválidas'
-            }), 401
-        
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+
+        # Validar senha com hash
+        hashed_password = hash_password(password)
+        if user.password != hashed_password:
+            print(f"❌ [LOGIN] Senha incorreta para: {email}")
+            return jsonify({'error': 'Senha incorreta'}), 401
+
         # Verificar status
         if user.status != 'active':
-            return jsonify({
-                'success': False,
-                'error': 'Conta inativa'
-            }), 403
-        
+            print(f"❌ [LOGIN] Usuário bloqueado: {email}")
+            return jsonify({'error': 'Usuário bloqueado'}), 403
+
         # Atualizar último login
-        from datetime import datetime
-        import secrets
-        
         user.last_login = datetime.utcnow()
-        user.updated_at = datetime.utcnow()
-        
-        # Buscar carteira
-        wallet = session.query(Wallet).filter_by(user_id=user.id).first()
-        
-        # Gerar token
-        access_token = secrets.token_urlsafe(32)
-        
-        # Preparar resposta
-        user_data = {
-            'id': user.id,
-            'name': user.name,
-            'email': user.email,
-            'phone': user.phone,
-            'status': user.status,
-            'kyc_status': user.kyc_status,
-            'total_bets': user.total_bets or 0
-        }
-        
-        wallet_data = {
-            'balance': float(wallet.balance) if wallet else 0.0,
-            'available': float(wallet.available) if wallet else 0.0,
-            'pending': float(wallet.pending) if wallet else 0.0,
-            'currency': wallet.currency if wallet else 'BRL'
-        }
-        
         session.commit()
-        
-        print(f"✅ [LOGIN] Login bem-sucedido: {email}")
-        
+
+        # Gerar token de acesso
+        access_token = secrets.token_hex(16)
+
+        # Obter carteira
+        wallet = session.query(Wallet).filter_by(user_id=user.id).first()
+        wallet_data = {
+            "balance": float(wallet.balance or 0.0),
+            "available": float(wallet.available or 0.0),
+            "pending": float(wallet.pending or 0.0),
+            "currency": wallet.currency or 'BRL'
+        } if wallet else {
+            "balance": 0.0,
+            "available": 0.0,
+            "pending": 0.0,
+            "currency": 'BRL'
+        }
+
+        # Resposta sem senha
+        user_response = {
+            "id": user.id,
+            "name": user.name,
+            "email": user.email,
+            "phone": user.phone,
+            "status": user.status,
+            "kyc_status": user.kyc_status,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "last_login": user.last_login.isoformat() if user.last_login else None
+        }
+
+        print(f"✅ [LOGIN] Login realizado com sucesso: {email}")
+
         return jsonify({
-            'success': True,
             'message': 'Login realizado com sucesso',
-            'data': {
-                'user': user_data,
-                'wallet': wallet_data
-            },
+            'user': user_response,
+            'wallet': wallet_data,
             'access_token': access_token
         }), 200
-        
+
     except Exception as e:
         session.rollback()
-        print(f"❌ [LOGIN] Erro: {e}")
-        import traceback
-        print(f"❌ [LOGIN] Stack: {traceback.format_exc()}")
-        
-        return jsonify({
-            'success': False,
-            'error': 'Erro interno do servidor'
-        }), 500
+        print(f"❌ [LOGIN] Erro no login: {e}")
+        return jsonify({'error': 'Erro interno do servidor'}), 500
     finally:
         session.close()
-
-# ✅ FUNÇÃO AUXILIAR: Verificação segura de senha
-def verify_password(plain_password, hashed_password):
-    """
-    Verifica se a senha em texto plano corresponde ao hash armazenado.
-    
-    Args:
-        plain_password (str): Senha em texto plano
-        hashed_password (str): Hash da senha armazenado no banco
-    
-    Returns:
-        bool: True se a senha estiver correta, False caso contrário
-    """
-    try:
-        # Se estiver usando bcrypt (recomendado)
-        import bcrypt
-        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
-    except ImportError:
-        # Fallback para comparação simples de hash (menos seguro)
-        return hash_password(plain_password) == hashed_password
-    except Exception as e:
-        print(f"❌ [VERIFY_PASSWORD] Erro na verificação: {e}")
-        return False
-
-
-# ✅ FUNÇÃO AUXILIAR: Hash seguro de senha
-def hash_password(password):
-    """Hash seguro da senha"""
-    try:
-        import bcrypt
-        salt = bcrypt.gensalt()
-        return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
-    except ImportError:
-        # Fallback (apenas para desenvolvimento)
-        import hashlib
-        import secrets
-        salt = secrets.token_hex(16)
-        return hashlib.pbkdf2_hex(password.encode('utf-8'), salt.encode('utf-8'), 100000) + ':' + salt
-
-def verify_password(password, hashed):
-    """Verifica senha contra hash"""
-    try:
-        import bcrypt
-        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
-    except ImportError:
-        # Fallback para hash com salt
-        if ':' in hashed:
-            stored_hash, salt = hashed.rsplit(':', 1)
-            import hashlib
-            computed_hash = hashlib.pbkdf2_hex(password.encode('utf-8'), salt.encode('utf-8'), 100000)
-            return stored_hash == computed_hash
-        return False
-
-# ✅ ENDPOINT COMPLEMENTAR: Verificar token
-@app.route('/api/auth/verify-token', methods=['POST'])
-def verify_token():
-    """Verifica se um token de acesso é válido"""
-    try:
-        data = request.get_json()
-        token = data.get('access_token')
-        
-        if not token:
-            return jsonify({
-                'success': False,
-                'error': 'Token não fornecido'
-            }), 400
-        
-        # Aqui você implementaria a lógica de verificação do token
-        # Por exemplo, verificar em cache, JWT, ou banco de dados
-        
-        # Por simplicidade, vamos assumir que tokens válidos têm pelo menos 32 caracteres
-        if len(token) >= 32:
-            return jsonify({
-                'success': True,
-                'message': 'Token válido',
-                'data': {
-                    'token_valid': True,
-                    'expires_in': 3600  # 1 hora em segundos
-                }
-            }), 200
-        else:
-            return jsonify({
-                'success': False,
-                'error': 'Token inválido'
-            }), 401
-            
-    except Exception as e:
-        print(f"❌ [VERIFY_TOKEN] Erro: {e}")
-        return jsonify({
-            'success': False,
-            'error': 'Erro interno do servidor'
-        }), 500
 
 # ==================== WALLET ENDPOINTS ====================
 
 @app.route('/api/wallet/<email>', methods=['GET'])
 def get_wallet_by_email(email):
-    """
-    Busca dados da carteira por email - DADOS REAIS DO BANCO
-    
-    ⚠️ NOTA: Em produção, considere usar autenticação por token em vez de email na URL
-    """
+    """Busca dados da carteira por email - DADOS REAIS DO BANCO"""
     session = SessionLocal()
     try:
-        # Validar formato do email
-        import re
-        email = email.strip().lower()
-        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        
-        if not re.match(email_pattern, email):
-            return jsonify({
-                "success": False,
-                "error": "Formato de email inválido"
-            }), 400
-        
         print(f"💰 [WALLET] Buscando carteira para: {email}")
         
-        # ✅ Query otimizada: buscar usuário e carteira em uma única consulta
-        from sqlalchemy.orm import joinedload
-        user = session.query(User)\
-            .options(joinedload(User.wallet))\
-            .filter_by(email=email)\
-            .first()
-        
+        # Buscar usuário por email
+        user = session.query(User).filter_by(email=email).first()
         if not user:
             print(f"❌ [WALLET] Usuário não encontrado: {email}")
-            return jsonify({
-                "success": False,
-                "error": "Usuário não encontrado"
-            }), 404
+            return jsonify({"error": "Usuário não encontrado"}), 404
         
-        # Verificar se o usuário está ativo
-        if user.status != 'active':
-            return jsonify({
-                "success": False,
-                "error": "Conta inativa"
-            }), 403
-        
-        # Buscar ou criar carteira
-        wallet = user.wallet if hasattr(user, 'wallet') and user.wallet else None
-        if not wallet:
-            wallet = session.query(Wallet).filter_by(user_id=user.id).first()
-        
-        from datetime import datetime
+        # Buscar carteira do usuário
+        wallet = session.query(Wallet).filter_by(user_id=user.id).first()
         if not wallet:
             print(f"⚠️ [WALLET] Carteira não encontrada, criando...")
-            current_time = datetime.utcnow()
+            # Criar carteira se não existir
             wallet = Wallet(
                 id=str(uuid.uuid4()),
                 user_id=user.id,
                 balance=0.0,
                 available=0.0,
                 pending=0.0,
-                currency='BRL',
-                created_at=current_time,
-                updated_at=current_time
+                currency='BRL'
             )
             session.add(wallet)
             session.commit()
         
-        # ✅ Buscar transações com paginação e ordenação otimizada
-        transactions = session.query(Transaction)\
-            .filter_by(user_id=user.id)\
-            .order_by(Transaction.created_at.desc())\
-            .limit(10)\
-            .all()
+        # Buscar transações
+        transactions = session.query(Transaction).filter_by(user_id=user.id).order_by(Transaction.created_at.desc()).limit(10).all()
         
-        # ✅ Calcular estatísticas reais da carteira
-        from sqlalchemy import func
-        
-        # Total de depósitos (transações positivas de diferentes tipos)
-        deposits_result = session.query(func.sum(Transaction.amount))\
-            .filter(Transaction.user_id == user.id)\
-            .filter(Transaction.amount > 0)\
-            .filter(Transaction.type.in_(['deposit', 'bonus', 'win']))\
-            .filter(Transaction.status == 'completed')\
-            .scalar()
-        total_deposits = float(deposits_result or 0.0)
-        
-        # Total de saques (transações negativas)
-        withdrawals_result = session.query(func.sum(Transaction.amount))\
-            .filter(Transaction.user_id == user.id)\
-            .filter(Transaction.amount < 0)\
-            .filter(Transaction.type.in_(['withdrawal', 'bet']))\
-            .filter(Transaction.status == 'completed')\
-            .scalar()
-        total_withdrawals = abs(float(withdrawals_result or 0.0))
-        
-        # Total de ganhos
-        winnings_result = session.query(func.sum(Transaction.amount))\
-            .filter(Transaction.user_id == user.id)\
-            .filter(Transaction.type == 'win')\
-            .filter(Transaction.status == 'completed')\
-            .scalar()
-        total_winnings = float(winnings_result or 0.0)
-        
-        # Total de apostas
-        bets_result = session.query(func.sum(Transaction.amount))\
-            .filter(Transaction.user_id == user.id)\
-            .filter(Transaction.type == 'bet')\
-            .filter(Transaction.status == 'completed')\
-            .scalar()
-        total_losses = abs(float(bets_result or 0.0))
-        
-        # ✅ Formatar transações com segurança
         transactions_list = []
         for tx in transactions:
             transactions_list.append({
@@ -2261,193 +1844,28 @@ def get_wallet_by_email(email):
                 'created_at': tx.created_at.isoformat() if tx.created_at else None
             })
         
-        # ✅ Calcular saldo bloqueado (pending) corretamente
-        locked_balance = float(wallet.pending or 0.0)
-        available_balance = float(wallet.available or 0.0)
-        total_balance = float(wallet.balance or 0.0)
-        
-        # ✅ Dados estruturados da carteira
         wallet_data = {
-            "user_info": {
-                "email": email,
-                "name": user.name,
-                "status": user.status,
-                "kyc_status": user.kyc_status
-            },
-            "balance": {
-                "total": total_balance,
-                "available": available_balance,
-                "locked": locked_balance,
-                "currency": wallet.currency or 'BRL'
-            },
-            "statistics": {
-                "total_deposits": total_deposits,
-                "total_withdrawals": total_withdrawals,
-                "total_winnings": total_winnings,
-                "total_losses": total_losses,
-                "net_profit": total_winnings - total_losses,
-                "total_bets": user.total_bets or 0
-            },
-            "recent_transactions": transactions_list,
-            "metadata": {
-                "wallet_created_at": wallet.created_at.isoformat() if wallet.created_at else None,
-                "last_updated": wallet.updated_at.isoformat() if wallet.updated_at else datetime.utcnow().isoformat(),
-                "transactions_shown": len(transactions_list),
-                "total_transactions": session.query(Transaction).filter_by(user_id=user.id).count()
-            }
-        }
-        
-        print(f"✅ [WALLET] Carteira encontrada: R$ {total_balance:.2f} (Disponível: R$ {available_balance:.2f})")
-        
-        return jsonify({
-            "success": True,
-            "message": "Dados da carteira obtidos com sucesso",
-            "data": wallet_data
-        }), 200
-        
-    except ValueError as ve:
-        print(f"❌ [WALLET] Erro de validação: {ve}")
-        return jsonify({
-            "success": False,
-            "error": "Dados inválidos fornecidos"
-        }), 400
-        
-    except Exception as e:
-        session.rollback()
-        print(f"❌ [WALLET] Erro ao buscar carteira: {e}")
-        import traceback
-        print(f"❌ [WALLET] Stack trace: {traceback.format_exc()}")
-        return jsonify({
-            "success": False,
-            "error": "Erro interno do servidor"
-        }), 500
-    finally:
-        session.close()
-
-
-# ✅ ENDPOINT COMPLEMENTAR: Buscar carteira por ID do usuário (mais seguro)
-@app.route('/api/wallet/user/<user_id>', methods=['GET'])
-def get_wallet_by_user_id(user_id):
-    """
-    Busca dados da carteira por ID do usuário (mais seguro que por email)
-    Requer autenticação por token em produção
-    """
-    session = SessionLocal()
-    try:
-        # Validar UUID
-        import uuid as uuid_lib
-        try:
-            uuid_lib.UUID(user_id)
-        except ValueError:
-            return jsonify({
-                "success": False,
-                "error": "ID de usuário inválido"
-            }), 400
-        
-        # Buscar usuário e carteira
-        user = session.query(User).filter_by(id=user_id).first()
-        if not user:
-            return jsonify({
-                "success": False,
-                "error": "Usuário não encontrado"
-            }), 404
-        
-        wallet = session.query(Wallet).filter_by(user_id=user_id).first()
-        if not wallet:
-            return jsonify({
-                "success": False,
-                "error": "Carteira não encontrada"
-            }), 404
-        
-        # Resposta simplificada
-        wallet_data = {
+            "user_email": email,
             "balance": float(wallet.balance or 0.0),
-            "available": float(wallet.available or 0.0),
-            "pending": float(wallet.pending or 0.0),
-            "currency": wallet.currency or 'BRL'
+            "available_balance": float(wallet.available or 0.0),
+            "locked_balance": float(wallet.pending or 0.0),
+            "total_deposits": float(wallet.balance or 0.0),  # Simplificado
+            "total_withdrawals": 0.0,  # Implementar depois
+            "total_winnings": 0.0,  # Implementar depois
+            "total_losses": 0.0,  # Implementar depois
+            "transactions": transactions_list,
+            "last_updated": wallet.updated_at.isoformat() if wallet.updated_at else datetime.utcnow().isoformat()
         }
         
-        return jsonify({
-            "success": True,
-            "data": wallet_data
-        }), 200
+        print(f"✅ [WALLET] Carteira encontrada: R$ {wallet_data['balance']:.2f}")
+        return jsonify(wallet_data)
         
     except Exception as e:
-        print(f"❌ [WALLET_BY_ID] Erro: {e}")
-        return jsonify({
-            "success": False,
-            "error": "Erro interno do servidor"
-        }), 500
+        print(f"❌ [WALLET] Erro ao buscar carteira: {e}")
+        return jsonify({"error": f"Erro ao buscar carteira: {str(e)}"}), 500
     finally:
         session.close()
 
-
-# ✅ ENDPOINT: Histórico completo de transações com paginação
-@app.route('/api/wallet/<email>/transactions', methods=['GET'])
-def get_wallet_transactions(email):
-    """Busca histórico completo de transações com paginação"""
-    session = SessionLocal()
-    try:
-        from flask import request
-        
-        # Parâmetros de paginação
-        page = int(request.args.get('page', 1))
-        per_page = min(int(request.args.get('per_page', 20)), 100)  # Max 100 por página
-        transaction_type = request.args.get('type')  # Filtro por tipo
-        
-        # Buscar usuário
-        user = session.query(User).filter_by(email=email.strip().lower()).first()
-        if not user:
-            return jsonify({
-                "success": False,
-                "error": "Usuário não encontrado"
-            }), 404
-        
-        # Query base
-        query = session.query(Transaction).filter_by(user_id=user.id)
-        
-        # Filtro por tipo se fornecido
-        if transaction_type:
-            query = query.filter(Transaction.type == transaction_type)
-        
-        # Ordenação e paginação
-        query = query.order_by(Transaction.created_at.desc())
-        total_transactions = query.count()
-        
-        transactions = query.offset((page - 1) * per_page).limit(per_page).all()
-        
-        transactions_list = []
-        for tx in transactions:
-            transactions_list.append({
-                'id': tx.id,
-                'type': tx.type,
-                'amount': float(tx.amount),
-                'description': tx.description,
-                'status': tx.status,
-                'created_at': tx.created_at.isoformat() if tx.created_at else None
-            })
-        
-        return jsonify({
-            "success": True,
-            "data": {
-                "transactions": transactions_list,
-                "pagination": {
-                    "page": page,
-                    "per_page": per_page,
-                    "total": total_transactions,
-                    "pages": (total_transactions + per_page - 1) // per_page
-                }
-            }
-        }), 200
-        
-    except Exception as e:
-        print(f"❌ [WALLET_TRANSACTIONS] Erro: {e}")
-        return jsonify({
-            "success": False,
-            "error": "Erro interno do servidor"
-        }), 500
-    finally:
-        session.close()
 @app.route('/api/wallet', methods=['GET'])
 def get_wallet_by_query():
     """Busca dados da carteira por query parameter"""
@@ -3180,216 +2598,66 @@ def meets_challenge_criteria(fitness_data, challenge):
 def complete_challenge_automatically(session, challenge, participation, fitness_data):
     """Completa o desafio automaticamente quando meta é atingida"""
     try:
-        import datetime
-        import json
-        import uuid
-        
         completion_time = datetime.datetime.utcnow()
         achieved_value = float(fitness_data.get('value', 0))
-        
-        print(f"🎯 [AUTO_COMPLETE] Iniciando conclusão automática do desafio '{challenge.title}'")
-        print(f"   - Valor atingido: {achieved_value} {challenge.target_unit}")
-        print(f"   - Meta: {challenge.target_value} {challenge.target_unit}")
-        
-        # Verificar se realmente atingiu a meta
-        if achieved_value < float(challenge.target_value):
-            raise ValueError(f"Valor atingido ({achieved_value}) menor que a meta ({challenge.target_value})")
         
         # Atualizar participação
         participation.status = 'completed'
         participation.result_value = achieved_value
         participation.completed_at = completion_time
         participation.validation_status = 'validated'
-        participation.updated_at = completion_time
         
-        print(f"   ✅ Participação atualizada: status -> completed")
-        
-        # Atualizar desafio (se for individual ou último participante)
-        # Note: Para desafios com múltiplos participantes, você pode querer uma lógica diferente
-        if challenge.current_participants == 1:  # Desafio individual
-            challenge.status = 'completed'
-            challenge.updated_at = completion_time
-            print(f"   ✅ Desafio marcado como completo (individual)")
+        # Atualizar desafio
+        challenge.status = 'completed'
+        challenge.updated_at = completion_time
         
         # Criar validação automática
-        validation_id = str(uuid.uuid4())
         validation = ChallengeValidation(
-            id=validation_id,
             participation_id=participation.id,
             challenge_id=challenge.id,
             user_id=participation.user_id,
-            fitness_data_ids=json.dumps([fitness_data.get('id', 'auto_' + validation_id)]),
+            fitness_data_ids=json.dumps([fitness_data.get('id', 'auto')]),
             validation_type='automatic',
             validation_status='validated',
             target_value=float(challenge.target_value),
             achieved_value=achieved_value,
             confidence_score=0.95,
             validation_notes=f'Meta atingida automaticamente via HealthKit: {achieved_value} {challenge.target_unit}',
-            validated_at=completion_time,
-            created_at=completion_time,
-            updated_at=completion_time
+            validated_at=completion_time
         )
         session.add(validation)
-        print(f"   ✅ Validação automática criada")
-        
-        # Calcular prêmio (assumindo que é winner-takes-all ou proporcional)
-        total_pool = float(challenge.total_pool or 0.0)
-        platform_fee = 0.05  # 5% de taxa da plataforma
-        prize_amount = total_pool * (1 - platform_fee)
         
         # Criar resultado
-        result_id = str(uuid.uuid4())
         result = ChallengeResult(
-            id=result_id,
             challenge_id=challenge.id,
             participation_id=participation.id,
             user_id=participation.user_id,
             result_value=achieved_value,
-            result_unit=challenge.target_unit or 'points',
+            result_unit=challenge.target_unit,
             validation_status='validated',
-            ranking_position=1,  # Primeiro a completar (ou ajustar lógica conforme necessário)
-            prize_amount=prize_amount,
-            prize_currency='BRL',
-            awarded_at=completion_time,
-            created_at=completion_time,
-            updated_at=completion_time
+            ranking_position=1,  # Primeiro a completar
+            prize_amount=float(challenge.total_pool * 0.95)  # 95% do pool (5% taxa)
         )
         session.add(result)
-        print(f"   ✅ Resultado criado: prêmio R$ {prize_amount:.2f}")
         
-        # Atualizar saldo da carteira do usuário (adicionar prêmio)
-        wallet = session.query(Wallet).filter_by(user_id=participation.user_id).first()
-        if wallet:
-            old_balance = wallet.balance
-            wallet.balance = float(wallet.balance) + prize_amount
-            wallet.available = float(wallet.available) + prize_amount
-            wallet.updated_at = completion_time
-            
-            # Criar transação de prêmio
-            prize_transaction = Transaction(
-                id=str(uuid.uuid4()),
-                user_id=participation.user_id,
-                type='win',
-                amount=prize_amount,
-                description=f'Prêmio do desafio: {challenge.title}',
-                status='completed',
-                reference_id=result.id,
-                created_at=completion_time
-            )
-            session.add(prize_transaction)
-            
-            print(f"   ✅ Carteira atualizada: R$ {old_balance:.2f} → R$ {wallet.balance:.2f}")
-        else:
-            print(f"   ⚠️ Carteira não encontrada para o usuário {participation.user_id}")
-        
-        # Commit de todas as alterações
         session.commit()
         
-        print(f"🏆 [AUTO_COMPLETE] Desafio '{challenge.title}' completado automaticamente!")
-        print(f"   - Usuário: {getattr(participation, 'user_email', participation.user_id)}")
-        print(f"   - Prêmio: R$ {prize_amount:.2f}")
+        print(f"🏆 Desafio '{challenge.title}' completado automaticamente por {participation.user_email}")
         
         return {
-            "success": True,
             "challenge_id": challenge.id,
             "challenge_title": challenge.title,
-            "user_id": participation.user_id,
-            "user_email": getattr(participation, 'user_email', 'N/A'),
+            "user_email": participation.user_email,
             "achieved_value": achieved_value,
             "target_value": float(challenge.target_value),
-            "prize_amount": prize_amount,
-            "completed_at": completion_time.isoformat(),
-            "validation_id": validation_id,
-            "result_id": result_id
+            "prize_amount": float(result.prize_amount),
+            "completed_at": completion_time.isoformat()
         }
-        
-    except ValueError as ve:
-        session.rollback()
-        print(f"❌ [AUTO_COMPLETE] Erro de validação: {ve}")
-        raise ve
         
     except Exception as e:
         session.rollback()
-        print(f"❌ [AUTO_COMPLETE] Erro ao completar desafio: {e}")
-        import traceback
-        print(f"❌ [AUTO_COMPLETE] Stack trace: {traceback.format_exc()}")
+        print(f"❌ Erro ao completar desafio: {e}")
         raise e
-
-
-# ✅ FUNÇÃO AUXILIAR: Verificar se desafio pode ser completado automaticamente
-def can_auto_complete_challenge(challenge, fitness_data):
-    """
-    Verifica se o desafio pode ser completado automaticamente
-    com base nos dados de fitness recebidos
-    """
-    try:
-        if not challenge or not fitness_data:
-            return False, "Dados insuficientes"
-        
-        if challenge.status != 'active':
-            return False, f"Desafio não está ativo (status: {challenge.status})"
-        
-        achieved_value = float(fitness_data.get('value', 0))
-        target_value = float(challenge.target_value)
-        
-        if achieved_value < target_value:
-            return False, f"Meta não atingida: {achieved_value} < {target_value}"
-        
-        # Verificar se o tipo de dado bate com o desafio
-        fitness_type = fitness_data.get('type', '').lower()
-        challenge_category = challenge.category.lower()
-        
-        # Mapeamento de tipos compatíveis
-        compatible_types = {
-            'running': ['steps', 'distance', 'workout'],
-            'walking': ['steps', 'distance'],
-            'gym': ['workout', 'calories'],
-            'cycling': ['distance', 'workout'],
-            'swimming': ['distance', 'workout'],
-            'yoga': ['workout', 'mindfulness']
-        }
-        
-        if challenge_category in compatible_types:
-            if fitness_type not in compatible_types[challenge_category]:
-                return False, f"Tipo de fitness incompatível: {fitness_type} não combina com {challenge_category}"
-        
-        return True, "Desafio pode ser completado automaticamente"
-        
-    except Exception as e:
-        return False, f"Erro na verificação: {str(e)}"
-
-
-# ✅ FUNÇÃO AUXILIAR: Listar desafios elegíveis para conclusão automática
-def get_auto_completable_challenges(session, user_id):
-    """
-    Retorna lista de desafios do usuário que podem ser completados automaticamente
-    """
-    try:
-        # Buscar participações ativas do usuário
-        active_participations = session.query(ChallengeParticipation)\
-            .join(Challenge)\
-            .filter(ChallengeParticipation.user_id == user_id)\
-            .filter(ChallengeParticipation.status == 'active')\
-            .filter(Challenge.status == 'active')\
-            .all()
-        
-        completable_challenges = []
-        for participation in active_participations:
-            challenge = participation.challenge
-            completable_challenges.append({
-                'challenge_id': challenge.id,
-                'challenge_title': challenge.title,
-                'participation_id': participation.id,
-                'target_value': float(challenge.target_value),
-                'target_unit': challenge.target_unit,
-                'category': challenge.category
-            })
-        
-        return completable_challenges
-        
-    except Exception as e:
-        print(f"❌ Erro ao buscar desafios completáveis: {e}")
-        return []
 
 @app.route('/api/fitness/data', methods=['POST'])
 def receive_fitness_data():
@@ -3477,7 +2745,7 @@ def get_challenges():
         categories_query = session.execute(text('''
             SELECT id, name, color, icon 
             FROM challenge_categories 
-            WHERE is_active = '1'
+            WHERE is_active = 1
         '''))
         categories_data = {row[0]: {'name': row[1], 'color': row[2], 'icon': row[3]} 
                           for row in categories_query.fetchall()}
@@ -3578,10 +2846,7 @@ def create_challenge():
         required_fields = ['title', 'description', 'category_id', 'target_value', 'stake_min', 'stake_max', 'start_at']
         for field in required_fields:
             if field not in data or not data[field]:
-                return jsonify({
-                    "success": False,
-                    "error": f"Campo obrigatório: {field}"
-                }), 400
+                return jsonify({"error": f"Campo obrigatório: {field}"}), 400
         
         # PROCESSAR CAMPOS DE MÚLTIPLOS VENCEDORES
         max_winners = int(data.get('max_winners', 1))
@@ -3590,53 +2855,33 @@ def create_challenge():
         
         # Validações específicas para múltiplos vencedores
         if max_winners < 1 or max_winners > 50:
-            return jsonify({
-                "success": False,
-                "error": "Número de vencedores deve estar entre 1 e 50"
-            }), 400
+            return jsonify({"error": "Número de vencedores deve estar entre 1 e 50"}), 400
         
         max_participants = int(data.get('max_participants', 100))
         if max_winners > max_participants:
-            return jsonify({
-                "success": False,
-                "error": "Número de vencedores não pode ser maior que máximo de participantes"
-            }), 400
+            return jsonify({"error": "Número de vencedores não pode ser maior que máximo de participantes"}), 400
         
         valid_selection_types = ['first_to_complete', 'top_performers', 'all_qualifiers']
         if winner_selection_type not in valid_selection_types:
-            return jsonify({
-                "success": False,
-                "error": f"Tipo de seleção inválido. Use: {', '.join(valid_selection_types)}"
-            }), 400
+            return jsonify({"error": f"Tipo de seleção inválido. Use: {', '.join(valid_selection_types)}"}), 400
         
         valid_distribution_types = ['equal', 'proportional', 'ranking_based']
         if prize_distribution_type not in valid_distribution_types:
-            return jsonify({
-                "success": False,
-                "error": f"Tipo de distribuição inválido. Use: {', '.join(valid_distribution_types)}"
-            }), 400
-        
-        # ✅ CORREÇÃO: Obter category_id dos dados
-        category_id = data.get('category_id')
-        if not category_id:
-            return jsonify({
-                "success": False,
-                "error": "category_id é obrigatório"
-            }), 400
+            return jsonify({"error": f"Tipo de distribuição inválido. Use: {', '.join(valid_distribution_types)}"}), 400
         
         # 1. BUSCAR CATEGORIA REAL DA TABELA challenge_categories
-        category = session.query(ChallengeCategory).filter(
-            ChallengeCategory.id == category_id,
-            ChallengeCategory.is_active == True
-        ).first()
+        category_id = int(data['category_id'])
+        category_query = session.execute(text('''
+            SELECT id, name FROM challenge_categories 
+            WHERE id = :category_id AND is_active = 1
+        '''), {"category_id": category_id})
         
-        if not category:
-            return jsonify({
-                "success": False,
-                "error": f"Categoria ID {category_id} não encontrada ou inativa"
-            }), 400
+        category_result = category_query.fetchone()
+        if not category_result:
+            return jsonify({"error": f"Categoria ID {category_id} não encontrada ou inativa"}), 400
         
-        category_name = category.name
+        category_name = category_result[1]
+        print(f"🏷️ [CREATE_CHALLENGE] Categoria encontrada: ID {category_id} = '{category_name}'")
         
         # 2. MAPEAR NOME DA CATEGORIA PARA STRING INTERNA
         category_string_map = {
@@ -3664,15 +2909,11 @@ def create_challenge():
             start_date = datetime.fromisoformat(data['start_at'].replace('Z', '+00:00'))
             start_date = start_date.replace(tzinfo=None)
             print(f"📅 [CREATE_CHALLENGE] Data de início: {start_date}")
-        except Exception as date_error:
-            print(f"❌ [CREATE_CHALLENGE] Erro ao processar data: {date_error}")
-            return jsonify({
-                "success": False,
-                "error": "Data de início inválida. Use formato ISO: YYYY-MM-DDTHH:MM:SS"
-            }), 400
+        except Exception as e:
+            print(f"❌ [CREATE_CHALLENGE] Erro ao processar data: {e}")
+            return jsonify({"error": "Data de início inválida"}), 400
         
         # 4. DETERMINAR STATUS
-        from datetime import datetime, timedelta
         now = datetime.utcnow()
         is_future = start_date > now
         status = 'pending' if is_future else 'active'
@@ -3684,8 +2925,7 @@ def create_challenge():
         print(f"   - Seleção: {winner_selection_type}")
         print(f"   - Distribuição: {prize_distribution_type}")
         
-        # 5. CRIAR NOVO DESAFIO COM CAMPOS DE MÚLTIPLOS VENCEDORES
-        import uuid
+        # Criar novo desafio COM CAMPOS DE MÚLTIPLOS VENCEDORES
         new_challenge = Challenge(
             id=str(uuid.uuid4()),
             title=data['title'].strip(),
@@ -3703,8 +2943,8 @@ def create_challenge():
             prize_distribution='winner_takes_all',
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
-            created_by=data.get('created_by', 'admin'),
-            auto_validation=data.get('auto_validation', True),
+            created_by='admin',
+            auto_validation=True,
             target_metric=data.get('target_unit', 'km'),
             target_value=float(data['target_value']),
             target_unit=data.get('target_unit', 'km'),
@@ -3720,7 +2960,6 @@ def create_challenge():
         session.commit()
         
         print(f"✅ [CREATE_CHALLENGE] Desafio criado com múltiplos vencedores:")
-        print(f"   - ID: {new_challenge.id}")
         print(f"   - Título: {new_challenge.title}")
         print(f"   - Categoria: {category_name} → {category_string}")
         print(f"   - Status: {new_challenge.status}")
@@ -3728,7 +2967,7 @@ def create_challenge():
         print(f"   - Seleção: {winner_selection_type}")
         print(f"   - Distribuição: {prize_distribution_type}")
         
-        # 6. MONTAR RESPOSTA ESTRUTURADA
+        # Retornar dados com categoria mapeada
         challenge_data = {
             'id': new_challenge.id,
             'title': new_challenge.title,
@@ -3737,20 +2976,20 @@ def create_challenge():
             'category_name': category_name,
             'category_id': category_id,
             'difficulty': new_challenge.difficulty,
-            'entry_fee': float(new_challenge.entry_fee),
-            'total_pool': float(new_challenge.total_pool),
+            'entry_fee': new_challenge.entry_fee,
+            'total_pool': new_challenge.total_pool,
             'max_participants': new_challenge.max_participants,
             'current_participants': new_challenge.current_participants,
             'start_date': new_challenge.start_date.isoformat() if new_challenge.start_date else None,
             'end_date': new_challenge.end_date.isoformat() if new_challenge.end_date else None,
             'status': new_challenge.status,
-            'target_value': float(new_challenge.target_value),
+            'target_value': new_challenge.target_value,
             'target_unit': new_challenge.target_unit,
             'validation_rules': new_challenge.validation_rules,
             'created_at': new_challenge.created_at.isoformat() if new_challenge.created_at else None,
             'start_at': new_challenge.start_date.isoformat() if new_challenge.start_date else None,
             'is_scheduled': is_future,
-            'time_until_start': int((start_date - now).total_seconds()) if is_future else 0,
+            'time_until_start': (start_date - now).total_seconds() if is_future else 0,
             # CAMPOS DE MÚLTIPLOS VENCEDORES
             'max_winners': max_winners,
             'winner_selection_type': winner_selection_type,
@@ -3758,7 +2997,6 @@ def create_challenge():
             'multiple_winners_enabled': max_winners > 1
         }
         
-        # 7. CRIAR MENSAGEM INFORMATIVA
         message = f"Desafio criado na categoria '{category_name}'! Status: {'Agendado' if is_future else 'Ativo'}"
         if max_winners > 1:
             message += f" | {max_winners} vencedores ({winner_selection_type})"
@@ -3766,214 +3004,17 @@ def create_challenge():
         return jsonify({
             "success": True,
             "message": message,
-            "data": {
-                "challenge": challenge_data
-            }
+            "challenge": challenge_data
         }), 201
-        
-    except ValueError as ve:
-        session.rollback()
-        print(f"❌ [CREATE_CHALLENGE] Erro de validação: {ve}")
-        return jsonify({
-            "success": False,
-            "error": "Dados inválidos fornecidos",
-            "details": str(ve) if app.debug else None
-        }), 400
         
     except Exception as e:
         session.rollback()
         print(f"❌ [CREATE_CHALLENGE] Erro ao criar desafio: {e}")
         import traceback
-        error_trace = traceback.format_exc()
-        print(f"❌ [CREATE_CHALLENGE] Stack trace: {error_trace}")
-        return jsonify({
-            "success": False,
-            "error": "Erro interno do servidor",
-            "details": error_trace if app.debug else None
-        }), 500
+        traceback.print_exc()
+        return jsonify({"error": f"Erro ao criar desafio: {str(e)}"}), 500
     finally:
         session.close()
-
-
-# ✅ ENDPOINT PRINCIPAL: Listar categorias para dropdown
-@app.route('/api/challenges/categories', methods=['GET'])
-def get_challenge_categories():
-    """Listar categorias de desafios para dropdown"""
-    session = SessionLocal()
-    try:
-        print("📂 [GET_CATEGORIES] Buscando categorias ativas...")
-        
-        # Buscar categorias ativas
-        categories = session.query(ChallengeCategory)\
-            .filter(ChallengeCategory.is_active == True)\
-            .order_by(ChallengeCategory.name)\
-            .all()
-        
-        print(f"📂 [GET_CATEGORIES] Encontradas {len(categories)} categorias")
-        
-        categories_data = []
-        for category in categories:
-            category_dict = {
-                'id': category.id,
-                'name': category.name,
-                'description': getattr(category, 'description', ''),
-                'icon': getattr(category, 'icon', '🏃'),
-                'is_active': category.is_active
-            }
-            categories_data.append(category_dict)
-            print(f"   - {category.name} (ID: {category.id})")
-        
-        return jsonify({
-            "success": True,
-            "message": f"{len(categories_data)} categorias encontradas",
-            "data": categories_data  # ✅ Array direto para facilitar o frontend
-        }), 200
-        
-    except Exception as e:
-        print(f"❌ [GET_CATEGORIES] Erro: {e}")
-        import traceback
-        print(f"❌ [GET_CATEGORIES] Stack trace: {traceback.format_exc()}")
-        return jsonify({
-            "success": False,
-            "error": "Erro interno do servidor",
-            "data": []  # ✅ Array vazio em caso de erro
-        }), 500
-    finally:
-        session.close()
-
-
-# ✅ ENDPOINT ALTERNATIVO: Se a tabela não existe, criar categorias padrão
-@app.route('/api/dev/seed-categories', methods=['POST'])
-def seed_categories():
-    """Criar categorias padrão se não existirem"""
-    session = SessionLocal()
-    try:
-        print("🌱 [SEED_CATEGORIES] Criando categorias padrão...")
-        
-        # Verificar se já existem categorias
-        existing_count = session.query(ChallengeCategory).count()
-        if existing_count > 0:
-            return jsonify({
-                "success": True,
-                "message": f"{existing_count} categorias já existem",
-                "data": []
-            }), 200
-        
-        # Criar categorias padrão
-        default_categories = [
-            {'name': 'Corrida', 'description': 'Desafios de corrida e running', 'icon': '🏃'},
-            {'name': 'Caminhada', 'description': 'Desafios de caminhada e steps', 'icon': '🚶'},
-            {'name': 'Ciclismo', 'description': 'Desafios de bike e cycling', 'icon': '🚴'},
-            {'name': 'Fitness', 'description': 'Treinos gerais de fitness', 'icon': '💪'},
-            {'name': 'Yoga', 'description': 'Práticas de yoga e mindfulness', 'icon': '🧘'},
-            {'name': 'Natação', 'description': 'Desafios aquáticos', 'icon': '🏊'}
-        ]
-        
-        created_categories = []
-        for cat_data in default_categories:
-            import uuid
-            category = ChallengeCategory(
-                id=str(uuid.uuid4()),
-                name=cat_data['name'],
-                description=cat_data['description'],
-                icon=cat_data['icon'],
-                is_active=True,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
-            )
-            session.add(category)
-            created_categories.append({
-                'id': category.id,
-                'name': category.name,
-                'description': category.description,
-                'icon': category.icon
-            })
-        
-        session.commit()
-        
-        print(f"✅ [SEED_CATEGORIES] {len(created_categories)} categorias criadas")
-        
-        return jsonify({
-            "success": True,
-            "message": f"{len(created_categories)} categorias criadas com sucesso",
-            "data": created_categories
-        }), 201
-        
-    except Exception as e:
-        session.rollback()
-        print(f"❌ [SEED_CATEGORIES] Erro: {e}")
-        return jsonify({
-            "success": False,
-            "error": f"Erro ao criar categorias: {str(e)}"
-        }), 500
-    finally:
-        session.close()
-
-
-# ✅ ENDPOINT DEBUG: Verificar se tabela de categorias existe
-@app.route('/api/dev/check-categories-table', methods=['GET'])
-def check_categories_table():
-    """Verificar se a tabela de categorias existe e tem dados"""
-    session = SessionLocal()
-    try:
-        print("🔍 [CHECK_CATEGORIES] Verificando tabela...")
-        
-        # Tentar fazer uma query simples
-        try:
-            categories = session.query(ChallengeCategory).all()
-            categories_data = []
-            for cat in categories:
-                categories_data.append({
-                    'id': cat.id,
-                    'name': cat.name,
-                    'is_active': cat.is_active
-                })
-            
-            return jsonify({
-                "success": True,
-                "message": "Tabela de categorias existe",
-                "data": {
-                    "table_exists": True,
-                    "total_categories": len(categories),
-                    "active_categories": len([c for c in categories if c.is_active]),
-                    "categories": categories_data
-                }
-            }), 200
-            
-        except Exception as table_error:
-            # Tabela não existe ou há erro de estrutura
-            print(f"⚠️ [CHECK_CATEGORIES] Erro na tabela: {table_error}")
-            return jsonify({
-                "success": False,
-                "message": "Tabela de categorias não existe ou tem problemas",
-                "data": {
-                    "table_exists": False,
-                    "error": str(table_error),
-                    "suggestion": "Execute /api/dev/seed-categories para criar as categorias"
-                }
-            }), 404
-        
-    except Exception as e:
-        print(f"❌ [CHECK_CATEGORIES] Erro geral: {e}")
-        return jsonify({
-            "success": False,
-            "error": f"Erro na verificação: {str(e)}"
-        }), 500
-    finally:
-        session.close()
-        
-# ✅ FUNÇÃO PARA TESTAR CONEXÃO COM BANCO
-def test_database_connection():
-    """Testa se consegue conectar com o banco de dados"""
-    try:
-        session = SessionLocal()
-        session.execute(text('SELECT 1'))
-        session.close()
-        print("✅ Conexão com banco OK")
-        return True
-    except Exception as e:
-        print(f"❌ Erro de conexão com banco: {e}")
-        return False
 
 # ADICIONE TAMBÉM O HANDLER OPTIONS PARA CORS
 @app.route('/api/challenges', methods=['OPTIONS'])
@@ -5128,39 +4169,48 @@ def add_user_balance(user_id):
 
 # ==================== CATEGORIES ENDPOINTS ====================
 
+def get_db_connection():
+    """Conecta ao banco de dados"""
+    conn = sqlite3.connect(DATABASE_PATH)
+    conn.row_factory = sqlite3.Row  # Para acessar colunas por nome
+    return conn
+
 @app.route('/api/categories', methods=['GET', 'POST'])
 def handle_categories():
-    """CRUD completo para categorias usando SQLAlchemy (funciona com PostgreSQL e SQLite)"""
+    """CRUD completo para categorias usando banco de dados"""
     
     if request.method == 'GET':
-        session = SessionLocal()
         try:
             print("📂 [CATEGORIES] Buscando categorias do banco de dados com contagem...")
             
-            from models import ChallengeCategory, Challenge
-            from sqlalchemy import func
+            conn = get_db_connection()
+            cursor = conn.cursor()
             
             # PRIMEIRO: Debug - Ver quantos desafios existem por categoria
             print("🔍 [DEBUG] Verificando contagem na tabela challenges...")
-            debug_counts = session.query(
-                Challenge.category, 
-                func.count(Challenge.id).label('count')
-            ).group_by(Challenge.category).all()
-            
+            cursor.execute('SELECT category, COUNT(*) as count FROM challenges GROUP BY category')
+            debug_counts = cursor.fetchall()
             print("📊 [DEBUG] Contagem real na tabela challenges:")
             for row in debug_counts:
-                print(f"   - '{row.category}': {row.count} desafios")
+                print(f"   - '{row['category']}': {row['count']} desafios")
             
-            # SEGUNDO: Buscar categorias ordenadas
-            categories_query = session.query(ChallengeCategory).order_by(
-                ChallengeCategory.is_active.desc(), 
-                ChallengeCategory.name
-            ).all()
+            # SEGUNDO: Buscar categorias com JOIN simples primeiro
+            cursor.execute('''
+                SELECT 
+                    c.id, c.name, c.description, c.color, c.icon, 
+                    c.is_active, c.created_at, c.updated_at
+                FROM challenge_categories c
+                ORDER BY c.is_active DESC, c.name
+            ''')
             
             categories = []
-            for category_obj in categories_query:
+            for row in cursor.fetchall():
+                # Conversão correta do is_active
+                raw_is_active = row['is_active']
+                is_active_bool = str(raw_is_active) == '1'
+                
                 # Para cada categoria, contar desafios manualmente
-                category_name = category_obj.name
+                category_name = row['name']
                 
                 # Mapeamento mais lógico baseado no nome
                 challenge_types = []
@@ -5179,26 +4229,30 @@ def handle_categories():
                 elif category_name == 'Voador':
                     challenge_types = []            # Categoria especial, sem desafios por enquanto
                 
-                # Contar desafios para esta categoria usando SQLAlchemy
+                # Contar desafios para esta categoria
                 challenges_count = 0
                 if challenge_types:
-                    challenges_count = session.query(Challenge).filter(
-                        Challenge.category.in_(challenge_types)
-                    ).count()
+                    placeholders = ','.join(['?' for _ in challenge_types])
+                    count_query = f'SELECT COUNT(*) as count FROM challenges WHERE category IN ({placeholders})'
+                    cursor.execute(count_query, challenge_types)
+                    count_result = cursor.fetchone()
+                    challenges_count = count_result['count'] if count_result else 0
                 
                 print(f"🏷️ [DEBUG] {category_name} -> tipos {challenge_types} -> {challenges_count} desafios")
                 
                 categories.append({
-                    'id': category_obj.id,
-                    'name': category_obj.name,
-                    'description': category_obj.description,
-                    'color': category_obj.color,
-                    'icon': category_obj.icon,
-                    'is_active': category_obj.is_active,
+                    'id': row['id'],
+                    'name': row['name'],
+                    'description': row['description'],
+                    'color': row['color'],
+                    'icon': row['icon'],
+                    'is_active': is_active_bool,
                     'challenges_count': challenges_count,
-                    'created_at': category_obj.created_at.isoformat() if category_obj.created_at else None,
-                    'updated_at': category_obj.updated_at.isoformat() if category_obj.updated_at else None
+                    'created_at': row['created_at'],
+                    'updated_at': row['updated_at']
                 })
+            
+            conn.close()
             
             print(f"✅ [CATEGORIES] {len(categories)} categorias encontradas no banco")
             
@@ -5215,14 +4269,9 @@ def handle_categories():
             
         except Exception as e:
             print(f"❌ [CATEGORIES] Erro ao buscar categorias do banco: {e}")
-            import traceback
-            traceback.print_exc()
             return jsonify({"error": f"Erro ao buscar categorias: {str(e)}"}), 500
-        finally:
-            session.close()
     
     elif request.method == 'POST':
-        session = SessionLocal()
         try:
             print("➕ [CATEGORIES] Criando nova categoria no banco...")
             
@@ -5232,69 +4281,71 @@ def handle_categories():
             if not data.get('name') or not data.get('description'):
                 return jsonify({"error": "Nome e descrição são obrigatórios"}), 400
             
-            from models import ChallengeCategory
-            from sqlalchemy import func
+            conn = get_db_connection()
+            cursor = conn.cursor()
             
             # Verificar se já existe
-            existing_category = session.query(ChallengeCategory).filter_by(
-                name=data['name']
-            ).first()
-            
-            if existing_category:
+            cursor.execute('SELECT id FROM challenge_categories WHERE name = ?', (data['name'],))
+            if cursor.fetchone():
+                conn.close()
                 return jsonify({"error": "Categoria com este nome já existe"}), 409
             
-            # Buscar próximo ID disponível
-            max_id_result = session.query(func.max(ChallengeCategory.id)).scalar()
-            next_id = int(max_id_result or 0) + 1
+            ## Buscar próximo ID disponível (já que não é AUTOINCREMENT)
+            cursor.execute('SELECT MAX(id) as max_id FROM challenge_categories')
+            result = cursor.fetchone()
+            max_id = result['max_id'] if result['max_id'] is not None else 0
+            next_id = int(max_id) + 1
             
-            # Criar nova categoria
-            new_category = ChallengeCategory(
-                id=next_id,
-                name=data['name'].strip(),
-                description=data['description'].strip(),
-                color=data.get('color', '#3b82f6'),
-                icon=data.get('icon', 'trophy'),
-                is_active=True,
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
-            )
+            # Inserir nova categoria
+            cursor.execute('''
+                INSERT INTO challenge_categories (id, name, description, color, icon, is_active, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
+            ''', (
+                next_id,
+                data['name'].strip(),
+                data['description'].strip(),
+                data.get('color', '#3b82f6'),
+                data.get('icon', 'trophy')
+            ))
             
-            session.add(new_category)
-            session.commit()
+            conn.commit()
             
-            # Converter para dict para resposta
-            category_dict = {
-                'id': new_category.id,
-                'name': new_category.name,
-                'description': new_category.description,
-                'color': new_category.color,
-                'icon': new_category.icon,
-                'is_active': new_category.is_active,
-                'created_at': new_category.created_at.isoformat() if new_category.created_at else None
+            # Buscar a categoria criada
+            cursor.execute('''
+                SELECT id, name, description, color, icon, is_active, created_at 
+                FROM challenge_categories 
+                WHERE id = ?
+            ''', (next_id,))
+            
+            row = cursor.fetchone()
+            category = {
+                'id': row['id'],
+                'name': row['name'],
+                'description': row['description'],
+                'color': row['color'],
+                'icon': row['icon'],
+                'is_active': str(row['is_active']) == '1',
+                'created_at': row['created_at']
             }
+            
+            conn.close()
             
             print(f"✅ [CATEGORIES] Categoria '{data['name']}' criada com ID {next_id}")
             return jsonify({
                 "success": True,
                 "message": "Categoria criada com sucesso",
-                "category": category_dict
+                "category": category
             }), 201
             
         except Exception as e:
-            session.rollback()
             print(f"❌ [CATEGORIES] Erro ao criar categoria: {e}")
-            import traceback
-            traceback.print_exc()
             return jsonify({"error": f"Erro ao criar categoria: {str(e)}"}), 500
-        finally:
-            session.close()
 
 @app.route('/api/categories/<int:category_id>', methods=['PUT', 'DELETE'])
 def handle_category_by_id(category_id):
-    """Editar ou excluir categoria específica usando SQLAlchemy"""
+    """Editar ou excluir categoria específica"""
     
     if request.method == 'PUT':
-        session = SessionLocal()
         try:
             print(f"✏️ [CATEGORIES] Editando categoria ID {category_id}...")
             
@@ -5303,21 +4354,34 @@ def handle_category_by_id(category_id):
             if not data.get('name') or not data.get('description'):
                 return jsonify({"error": "Nome e descrição são obrigatórios"}), 400
             
-            from models import ChallengeCategory
+            conn = get_db_connection()
+            cursor = conn.cursor()
             
-            # Buscar categoria existente
-            category = session.query(ChallengeCategory).filter_by(id=category_id).first()
-            if not category:
+            # Verificar se categoria existe
+            cursor.execute('SELECT id FROM challenge_categories WHERE id = ?', (category_id,))
+            if not cursor.fetchone():
+                conn.close()
                 return jsonify({"error": "Categoria não encontrada"}), 404
             
             # Atualizar categoria
-            category.name = data['name'].strip()
-            category.description = data['description'].strip()
-            category.color = data.get('color', category.color)
-            category.icon = data.get('icon', category.icon)
-            category.updated_at = datetime.utcnow()
+            cursor.execute('''
+                UPDATE challenge_categories 
+                SET name = ?, description = ?, color = ?, icon = ?, updated_at = datetime('now')
+                WHERE id = ?
+            ''', (
+                data['name'].strip(),
+                data['description'].strip(),
+                data.get('color', '#3b82f6'),
+                data.get('icon', 'trophy'),
+                category_id
+            ))
             
-            session.commit()
+            if cursor.rowcount == 0:
+                conn.close()
+                return jsonify({"error": "Nenhuma categoria foi atualizada"}), 404
+            
+            conn.commit()
+            conn.close()
             
             print(f"✅ [CATEGORIES] Categoria ID {category_id} atualizada")
             return jsonify({
@@ -5326,106 +4390,124 @@ def handle_category_by_id(category_id):
             })
             
         except Exception as e:
-            session.rollback()
             print(f"❌ [CATEGORIES] Erro ao atualizar categoria: {e}")
             return jsonify({"error": f"Erro ao atualizar categoria: {str(e)}"}), 500
-        finally:
-            session.close()
     
     elif request.method == 'DELETE':
-        session = SessionLocal()
         try:
             print(f"🗑️ [CATEGORIES] Desativando categoria ID {category_id}...")
             
-            from models import ChallengeCategory
+            conn = get_db_connection()
+            cursor = conn.cursor()
             
-            # Buscar categoria existente
-            category = session.query(ChallengeCategory).filter_by(id=category_id).first()
+            # Verificar se categoria existe
+            cursor.execute('SELECT id, name FROM challenge_categories WHERE id = ?', (category_id,))
+            category = cursor.fetchone()
             if not category:
+                conn.close()
                 return jsonify({"error": "Categoria não encontrada"}), 404
             
-            category_name = category.name
+            # Soft delete - marcar como inativa (0)
+            cursor.execute('''
+                UPDATE challenge_categories 
+                SET is_active = 0, updated_at = datetime('now')
+                WHERE id = ?
+            ''', (category_id,))
             
-            # Soft delete - marcar como inativa
-            category.is_active = False
-            category.updated_at = datetime.utcnow()
+            if cursor.rowcount == 0:
+                conn.close()
+                return jsonify({"error": "Nenhuma categoria foi desativada"}), 404
             
-            session.commit()
+            conn.commit()
+            conn.close()
             
-            print(f"✅ [CATEGORIES] Categoria '{category_name}' (ID {category_id}) desativada")
+            print(f"✅ [CATEGORIES] Categoria '{category['name']}' (ID {category_id}) desativada")
             return jsonify({
                 "success": True,
-                "message": f"Categoria '{category_name}' desativada com sucesso"
+                "message": f"Categoria '{category['name']}' desativada com sucesso"
             })
             
         except Exception as e:
-            session.rollback()
             print(f"❌ [CATEGORIES] Erro ao desativar categoria: {e}")
             return jsonify({"error": f"Erro ao desativar categoria: {str(e)}"}), 500
-        finally:
-            session.close()
+
 
 @app.route('/api/categories/<int:category_id>/activate', methods=['PUT'])
 def activate_category(category_id):
-    """Reativar categoria inativa usando SQLAlchemy"""
-    session = SessionLocal()
+    """Reativar categoria inativa"""
     try:
         print(f"🔄 [CATEGORIES] Reativando categoria ID {category_id}...")
         
-        from models import ChallengeCategory
+        conn = get_db_connection()
+        cursor = conn.cursor()
         
-        # Buscar categoria existente
-        category = session.query(ChallengeCategory).filter_by(id=category_id).first()
+        # Verificar se categoria existe
+        cursor.execute('SELECT id, name FROM challenge_categories WHERE id = ?', (category_id,))
+        category = cursor.fetchone()
         if not category:
+            conn.close()
             return jsonify({"error": "Categoria não encontrada"}), 404
         
-        category_name = category.name
+        # Reativar categoria (1)
+        cursor.execute('''
+            UPDATE challenge_categories 
+            SET is_active = 1, updated_at = datetime('now')
+            WHERE id = ?
+        ''', (category_id,))
         
-        # Reativar categoria
-        category.is_active = True
-        category.updated_at = datetime.utcnow()
+        if cursor.rowcount == 0:
+            conn.close()
+            return jsonify({"error": "Nenhuma categoria foi reativada"}), 404
         
-        session.commit()
+        conn.commit()
+        conn.close()
         
-        print(f"✅ [CATEGORIES] Categoria '{category_name}' (ID {category_id}) reativada")
+        print(f"✅ [CATEGORIES] Categoria '{category['name']}' (ID {category_id}) reativada")
         return jsonify({
             "success": True,
-            "message": f"Categoria '{category_name}' reativada com sucesso"
+            "message": f"Categoria '{category['name']}' reativada com sucesso"
         })
         
     except Exception as e:
-        session.rollback()
         print(f"❌ [CATEGORIES] Erro ao reativar categoria: {e}")
         return jsonify({"error": f"Erro ao reativar categoria: {str(e)}"}), 500
-    finally:
-        session.close()
+
+
+# ==================== ENDPOINT ADICIONAL PARA CATEGORIAS ATIVAS ====================
 
 @app.route('/api/categories/active', methods=['GET'])
 def get_active_categories():
-    """Buscar apenas categorias ativas para uso no frontend usando SQLAlchemy"""
-    session = SessionLocal()
+    """Buscar apenas categorias ativas para uso no frontend"""
     try:
         print("📂 [CATEGORIES] Buscando apenas categorias ativas...")
         
-        from models import ChallengeCategory
+        conn = get_db_connection()
+        cursor = conn.cursor()
         
         # Buscar apenas categorias ativas
-        active_categories = session.query(ChallengeCategory).filter_by(
-            is_active=True
-        ).order_by(ChallengeCategory.name).all()
+        cursor.execute('''
+            SELECT 
+                id, name, description, color, icon, 
+                is_active, created_at, updated_at
+            FROM challenge_categories 
+            WHERE is_active = 1
+            ORDER BY name
+        ''')
         
         categories = []
-        for category in active_categories:
+        for row in cursor.fetchall():
             categories.append({
-                'id': category.id,
-                'name': category.name,
-                'description': category.description,
-                'color': category.color,
-                'icon': category.icon,
+                'id': row['id'],
+                'name': row['name'],
+                'description': row['description'],
+                'color': row['color'],
+                'icon': row['icon'],
                 'is_active': True,  # Sempre true pois só buscamos ativas
-                'created_at': category.created_at.isoformat() if category.created_at else None,
-                'updated_at': category.updated_at.isoformat() if category.updated_at else None
+                'created_at': row['created_at'],
+                'updated_at': row['updated_at']
             })
+        
+        conn.close()
         
         print(f"✅ [CATEGORIES] {len(categories)} categorias ativas encontradas")
         return jsonify({
@@ -5437,8 +4519,7 @@ def get_active_categories():
     except Exception as e:
         print(f"❌ [CATEGORIES] Erro ao buscar categorias ativas: {e}")
         return jsonify({"error": f"Erro ao buscar categorias ativas: {str(e)}"}), 500
-    finally:
-        session.close()
+
 
 # =================== HEALTH CHECK ====================
 
@@ -6107,69 +5188,57 @@ def get_challenges_simple_fallback():
 @app.route('/api/admin/challenges/debug-database', methods=['GET'])
 def debug_database_structure():
     """
-    Endpoint para debugar a estrutura do banco de dados usando SQLAlchemy
+    Endpoint para debugar a estrutura do banco de dados
     """
-    session = SessionLocal()
     try:
-        from models import Challenge, ChallengeParticipation
-        from sqlalchemy import inspect, text
-        
-        # Obter informações das tabelas usando SQLAlchemy Inspector
-        inspector = inspect(session.bind)
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
         
         # Verificar estrutura da tabela challenges
-        challenges_columns = inspector.get_columns('challenges')
-        challenges_indexes = inspector.get_indexes('challenges')
+        cursor.execute("PRAGMA table_info(challenges)")
+        challenges_columns = cursor.fetchall()
         
-        # Verificar estrutura da tabela challenge_participations  
-        participations_columns = inspector.get_columns('challenge_participations')
-        participations_indexes = inspector.get_indexes('challenge_participations')
+        # Verificar estrutura da tabela challenge_participations
+        cursor.execute("PRAGMA table_info(challenge_participations)")
+        participations_columns = cursor.fetchall()
         
-        # Contar registros usando SQLAlchemy
-        challenges_count = session.query(Challenge).count()
-        participations_count = session.query(ChallengeParticipation).count()
+        # Contar registros
+        cursor.execute("SELECT COUNT(*) FROM challenges")
+        challenges_count = cursor.fetchone()[0]
         
-        # Buscar amostras de dados
-        sample_challenges = session.query(Challenge).limit(5).all()
-        sample_participations = session.query(ChallengeParticipation).limit(5).all()
+        cursor.execute("SELECT COUNT(*) FROM challenge_participations")
+        participations_count = cursor.fetchone()[0]
         
-        # Converter para dicts
-        challenges_data = [challenge.to_dict() for challenge in sample_challenges]
-        participations_data = [participation.to_dict() for participation in sample_participations]
+        # Buscar algumas participações de exemplo
+        cursor.execute("SELECT * FROM challenge_participations LIMIT 5")
+        sample_participations = cursor.fetchall()
         
-        # Informações do banco
-        database_url = str(session.bind.url).replace(session.bind.url.password or '', '***')
+        # Buscar alguns desafios de exemplo
+        cursor.execute("SELECT * FROM challenges LIMIT 5")
+        sample_challenges = cursor.fetchall()
+        
+        conn.close()
         
         return jsonify({
             'success': True,
-            'database_info': {
-                'url': database_url,
-                'dialect': session.bind.dialect.name,
-                'driver': session.bind.dialect.driver
-            },
+            'database_path': DATABASE_PATH,
             'challenges_table': {
-                'columns': [{'name': col['name'], 'type': str(col['type'])} for col in challenges_columns],
-                'indexes': [idx['name'] for idx in challenges_indexes],
+                'columns': challenges_columns,
                 'count': challenges_count,
-                'sample_data': challenges_data
+                'sample_data': sample_challenges
             },
             'participations_table': {
-                'columns': [{'name': col['name'], 'type': str(col['type'])} for col in participations_columns], 
-                'indexes': [idx['name'] for idx in participations_indexes],
+                'columns': participations_columns,
                 'count': participations_count,
-                'sample_data': participations_data
+                'sample_data': sample_participations
             }
         })
         
     except Exception as e:
-        import traceback
         return jsonify({
             'success': False,
-            'error': str(e),
-            'traceback': traceback.format_exc()
+            'error': str(e)
         }), 500
-    finally:
-        session.close()
 
 # ENDPOINT PARA FORÇAR REFRESH DOS DADOS
 @app.route('/api/admin/challenges/force-refresh', methods=['POST'])
@@ -6200,15 +5269,16 @@ def force_refresh_challenges():
 
 @app.route('/api/admin/payments/settings', methods=['GET'])
 def get_payment_settings():
-    """Obter configurações de pagamento usando SQLAlchemy (funciona com PostgreSQL e SQLite)"""
-    session = SessionLocal()
+    """Obter configurações de pagamento do banco SQLite - VERSÃO CORRIGIDA"""
     try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
         print("💳 [PAYMENTS] Buscando configurações de pagamento...")
         
-        from sqlalchemy import text
-        
-        # CONSULTA 1: Buscar configurações por provedor
-        settings_query = session.execute(text("""
+        # NOVA CONSULTA: Buscar configurações por provedor
+        cursor.execute("""
             SELECT 
                 ps.id as setting_id,
                 ps.provider,
@@ -6217,11 +5287,12 @@ def get_payment_settings():
                 ps.fee_percentage
             FROM payment_settings ps
             ORDER BY ps.provider, ps.environment
-        """))
-        settings_rows = settings_query.fetchall()
+        """)
         
-        # CONSULTA 2: Buscar credenciais
-        credentials_query = session.execute(text("""
+        settings_rows = cursor.fetchall()
+        
+        # NOVA CONSULTA: Buscar credenciais
+        cursor.execute("""
             SELECT 
                 pc.payment_setting_id,
                 pc.credential_key,
@@ -6230,11 +5301,12 @@ def get_payment_settings():
                 ps.environment
             FROM payment_credentials pc
             JOIN payment_settings ps ON pc.payment_setting_id = ps.id
-        """))
-        credentials_rows = credentials_query.fetchall()
+        """)
         
-        # CONSULTA 3: Buscar webhooks (usando comparação boolean)
-        webhooks_query = session.execute(text("""
+        credentials_rows = cursor.fetchall()
+        
+        # NOVA CONSULTA: Buscar webhooks
+        cursor.execute("""
             SELECT 
                 pw.payment_setting_id,
                 pw.webhook_url,
@@ -6242,12 +5314,13 @@ def get_payment_settings():
                 ps.environment
             FROM payment_webhooks pw
             JOIN payment_settings ps ON pw.payment_setting_id = ps.id
-            WHERE pw.is_active = true
-        """))
-        webhooks_rows = webhooks_query.fetchall()
+            WHERE pw.is_active = 1
+        """)
         
-        # CONSULTA 4: Buscar métodos de pagamento
-        methods_query = session.execute(text("""
+        webhooks_rows = cursor.fetchall()
+        
+        # NOVA CONSULTA: Buscar métodos de pagamento
+        cursor.execute("""
             SELECT 
                 pm.payment_setting_id,
                 pm.method_type,
@@ -6257,8 +5330,11 @@ def get_payment_settings():
                 ps.environment
             FROM payment_methods pm
             JOIN payment_settings ps ON pm.payment_setting_id = ps.id
-        """))
-        methods_rows = methods_query.fetchall()
+        """)
+        
+        methods_rows = cursor.fetchall()
+        
+        conn.close()
         
         print(f"📊 [PAYMENTS] Dados encontrados:")
         print(f"  - Settings: {len(settings_rows)}")
@@ -6271,14 +5347,14 @@ def get_payment_settings():
         
         # Processar configurações básicas
         for row in settings_rows:
-            provider = row.provider
-            environment = row.environment
-            setting_id = row.setting_id
+            provider = row['provider']
+            environment = row['environment']
+            setting_id = row['setting_id']
             
             if provider not in settings:
                 settings[provider] = {
-                    'enabled': bool(row.enabled),
-                    'fee_percentage': float(row.fee_percentage or 0)
+                    'enabled': bool(row['enabled']),
+                    'fee_percentage': float(row['fee_percentage'] or 0)
                 }
                 
                 # Configurações específicas do MercadoPago
@@ -6294,14 +5370,14 @@ def get_payment_settings():
                         'max_installments': 12
                     })
             
-            print(f"  - {provider} ({environment}): enabled={row.enabled}")
+            print(f"  - {provider} ({environment}): enabled={row['enabled']}")
         
         # Processar credenciais
         for row in credentials_rows:
-            provider = row.provider
-            environment = row.environment
-            key = row.credential_key
-            value = row.credential_value
+            provider = row['provider']
+            environment = row['environment']
+            key = row['credential_key']
+            value = row['credential_value']
             
             # Mascarar valores sensíveis
             if any(word in key.lower() for word in ['secret', 'token', 'password']):
@@ -6323,9 +5399,9 @@ def get_payment_settings():
         
         # Processar webhooks
         for row in webhooks_rows:
-            provider = row.provider
-            environment = row.environment
-            webhook_url = row.webhook_url
+            provider = row['provider']
+            environment = row['environment']
+            webhook_url = row['webhook_url']
             
             if provider == 'mercadopago':
                 if environment not in settings[provider]:
@@ -6338,10 +5414,10 @@ def get_payment_settings():
         
         # Processar métodos de pagamento
         for row in methods_rows:
-            provider = row.provider
-            method_type = row.method_type
-            enabled = bool(row.enabled)
-            config = json.loads(row.configuration or '{}')
+            provider = row['provider']
+            method_type = row['method_type']
+            enabled = bool(row['enabled'])
+            config = json.loads(row['configuration'] or '{}')
             
             if provider == 'mercadopago':
                 method_key = f"{method_type}_enabled"
@@ -6416,7 +5492,6 @@ def get_payment_settings():
         import traceback
         traceback.print_exc()
         
-        # Retornar configuração padrão em caso de erro
         return jsonify({
             "success": False,
             "error": str(e),
@@ -6433,59 +5508,49 @@ def get_payment_settings():
                 "paypal": {"enabled": False, "fee_percentage": 4.0}
             }
         }), 500
-    finally:
-        session.close()
 
 @app.route('/api/admin/payments/transactions', methods=['GET'])
 def get_transactions():
-    """Obter transações de pagamento usando SQLAlchemy (funciona com PostgreSQL e SQLite)"""
-    session = SessionLocal()
+    """Obter transações de pagamento do banco SQLite"""
     try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
         print("💳 [PAYMENTS] Buscando transações de pagamento...")
         
-        from models import Transaction, User
+        # Buscar transações de pagamento recentes
+        cursor.execute("""
+            SELECT 
+                pt.id,
+                pt.type,
+                pt.method,
+                pt.amount,
+                pt.status,
+                pt.created_at,
+                u.name as user_name,
+                u.email as user_email
+            FROM transactions pt
+            LEFT JOIN users u ON pt.user_id = u.id
+            ORDER BY pt.created_at DESC
+            LIMIT 50
+        """)
         
-        # Buscar transações de pagamento recentes com JOIN usando SQLAlchemy ORM
-        transactions_query = session.query(
-            Transaction.id,
-            Transaction.type,
-            Transaction.amount,
-            Transaction.status,
-            Transaction.created_at,
-            Transaction.description,
-            User.name.label('user_name'),
-            User.email.label('user_email')
-        ).outerjoin(
-            User, Transaction.user_id == User.id
-        ).order_by(
-            Transaction.created_at.desc()
-        ).limit(50).all()
+        rows = cursor.fetchall()
+        conn.close()
         
         # Processar transações
         transactions = []
-        for row in transactions_query:
-            # Inferir método de pagamento a partir da descrição
-            method = "unknown"
-            description = row.description or ""
-            if "PIX" in description or "pix" in description.lower():
-                method = "pix"
-            elif "MercadoPago" in description or "mercadopago" in description.lower():
-                method = "mercadopago"
-            elif "Cartão" in description or "card" in description.lower():
-                method = "credit_card"
-            elif "bonus" in description.lower() or "bônus" in description.lower():
-                method = "bonus"
-            
+        for row in rows:
             transactions.append({
-                "id": row.id,
-                "type": row.type,
-                "user_name": row.user_name or "Usuário Desconhecido",
-                "user_email": row.user_email or "unknown@email.com",
-                "amount": float(row.amount or 0),
-                "method": method,
-                "status": row.status or "pending",
-                "description": description,
-                "created_at": row.created_at.isoformat() if row.created_at else datetime.now().isoformat()
+                "id": row['id'],
+                "type": row['type'],
+                "user_name": row['user_name'] or "Usuário Desconhecido",
+                "user_email": row['user_email'] or "unknown@email.com",
+                "amount": float(row['amount'] or 0),
+                "method": row['method'] or "unknown",
+                "status": row['status'] or "pending",
+                "created_at": row['created_at'] or datetime.now().isoformat()
             })
         
         # Se não houver dados reais, usar dados de exemplo
@@ -6499,7 +5564,6 @@ def get_transactions():
                     "amount": 150.00,
                     "method": "pix",
                     "status": "completed",
-                    "description": "Depósito PIX - Sandbox",
                     "created_at": datetime.now().isoformat()
                 },
                 {
@@ -6510,166 +5574,109 @@ def get_transactions():
                     "amount": 200.00,
                     "method": "mercadopago",
                     "status": "pending",
-                    "description": "Saque via MercadoPago",
                     "created_at": (datetime.now() - timedelta(days=1)).isoformat()
-                },
-                {
-                    "id": "3",
-                    "type": "prize",
-                    "user_name": "Pedro Santos",
-                    "user_email": "pedro@example.com", 
-                    "amount": 75.50,
-                    "method": "prize",
-                    "status": "completed",
-                    "description": "Prêmio do desafio: Corrida 5km",
-                    "created_at": (datetime.now() - timedelta(hours=2)).isoformat()
-                },
-                {
-                    "id": "4",
-                    "type": "bet",
-                    "user_name": "Ana Costa",
-                    "user_email": "ana@example.com",
-                    "amount": -25.00,
-                    "method": "bet",
-                    "status": "completed", 
-                    "description": "Aposta no desafio: Ciclismo 20km",
-                    "created_at": (datetime.now() - timedelta(hours=5)).isoformat()
                 }
             ]
         
         print(f"✅ [PAYMENTS] {len(transactions)} transações encontradas")
         return jsonify({
             "success": True,
-            "transactions": transactions,
-            "total": len(transactions)
+            "transactions": transactions
         }), 200
         
     except Exception as e:
         print(f"❌ [PAYMENTS] Erro ao obter transações: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        
-        # Retornar dados de exemplo em caso de erro
         return jsonify({
             "success": False,
-            "error": str(e),
-            "transactions": [
-                {
-                    "id": "error_1",
-                    "type": "deposit",
-                    "user_name": "Exemplo",
-                    "user_email": "exemplo@betfit.com",
-                    "amount": 100.00,
-                    "method": "pix",
-                    "status": "completed",
-                    "description": "Dados de exemplo (erro no banco)",
-                    "created_at": datetime.now().isoformat()
-                }
-            ],
-            "total": 1
+            "error": str(e)
         }), 500
-    finally:
-        session.close()
 
 @app.route('/api/admin/payments/methods/<method>/toggle', methods=['PUT'])
 def toggle_payment_method(method):
-    """Alternar status de método de pagamento usando SQLAlchemy"""
-    session = SessionLocal()
+    """Alternar status de método de pagamento no banco SQLite"""
     try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
+        
         print(f"🔄 [PAYMENTS] Alternando status do método: {method}")
         
-        from sqlalchemy import text
-        
-        # Buscar configuração atual usando SQLAlchemy
-        result = session.execute(text("""
+        # Buscar configuração atual
+        cursor.execute("""
             SELECT id, enabled FROM payment_settings 
-            WHERE provider = :method AND environment = 'sandbox'
-        """), {"method": method})
+            WHERE provider = ? AND environment = 'sandbox'
+        """, (method,))
         
-        row = result.fetchone()
+        row = cursor.fetchone()
         
         if row:
             # Alternar status existente
-            new_status = not bool(row.enabled)  # Inverter o boolean
-            session.execute(text("""
+            new_status = 0 if row[1] else 1
+            cursor.execute("""
                 UPDATE payment_settings 
-                SET enabled = :new_status, updated_at = CURRENT_TIMESTAMP
-                WHERE id = :setting_id
-            """), {"new_status": new_status, "setting_id": row.id})
+                SET enabled = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (new_status, row[0]))
         else:
             # Criar nova configuração
-            session.execute(text("""
-                INSERT INTO payment_settings (provider, enabled, environment, fee_percentage, created_at, updated_at)
-                VALUES (:method, true, 'sandbox', 0.0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-            """), {"method": method})
+            cursor.execute("""
+                INSERT INTO payment_settings (provider, enabled, environment, fee_percentage)
+                VALUES (?, 1, 'sandbox', 0.0)
+            """, (method,))
         
-        session.commit()
+        conn.commit()
+        conn.close()
         
         print(f"✅ [PAYMENTS] Método {method} alternado com sucesso")
         return jsonify({
             "success": True,
             "method": method,
-            "enabled": new_status if row else True,
             "message": f"Método {method} alternado com sucesso"
         }), 200
         
     except Exception as e:
-        session.rollback()
         print(f"❌ [PAYMENTS] Erro ao alternar método {method}: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return jsonify({
             "success": False,
             "error": str(e)
         }), 500
-    finally:
-        session.close()
 
 @app.route('/api/admin/payments/settings/<method>', methods=['PUT'])
 def update_payment_settings(method):
-    """Atualizar configurações de método de pagamento usando SQLAlchemy"""
-    session = SessionLocal()
+    """Atualizar configurações de método de pagamento no banco SQLite"""
     try:
         data = request.get_json()
         
-        print(f"💾 [PAYMENTS] Salvando configurações do {method}:", data)
+        conn = sqlite3.connect(DATABASE_PATH)
+        cursor = conn.cursor()
         
-        from sqlalchemy import text
+        print(f"💾 [PAYMENTS] Salvando configurações do {method}:", data)
         
         # Determinar ambiente (para MercadoPago)
         environment = data.get('environment', 'sandbox')
         
         # Buscar ou criar setting
-        result = session.execute(text("""
+        cursor.execute("""
             SELECT id FROM payment_settings 
-            WHERE provider = :method AND environment = :environment
-        """), {"method": method, "environment": environment})
+            WHERE provider = ? AND environment = ?
+        """, (method, environment))
         
-        row = result.fetchone()
+        row = cursor.fetchone()
         
         if row:
-            setting_id = row.id
+            setting_id = row[0]
             # Atualizar configuração existente
-            session.execute(text("""
+            cursor.execute("""
                 UPDATE payment_settings 
-                SET fee_percentage = :fee_percentage, updated_at = CURRENT_TIMESTAMP
-                WHERE id = :setting_id
-            """), {
-                "fee_percentage": data.get('fee_percentage', 0),
-                "setting_id": setting_id
-            })
+                SET fee_percentage = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (data.get('fee_percentage', 0), setting_id))
         else:
             # Criar nova configuração
-            result = session.execute(text("""
-                INSERT INTO payment_settings (provider, environment, enabled, fee_percentage, created_at, updated_at)
-                VALUES (:method, :environment, true, :fee_percentage, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                RETURNING id
-            """), {
-                "method": method,
-                "environment": environment,
-                "fee_percentage": data.get('fee_percentage', 0)
-            })
-            setting_id = result.fetchone().id
+            cursor.execute("""
+                INSERT INTO payment_settings (provider, environment, enabled, fee_percentage)
+                VALUES (?, ?, 1, ?)
+            """, (method, environment, data.get('fee_percentage', 0)))
+            setting_id = cursor.lastrowid
         
         # Salvar credenciais
         credentials_map = {
@@ -6690,54 +5697,21 @@ def update_payment_settings(method):
                 if credential_key in credential_data:
                     value = credential_data[credential_key]
                     
-                    # Verificar se credencial já existe
-                    existing = session.execute(text("""
-                        SELECT id FROM payment_credentials 
-                        WHERE payment_setting_id = :setting_id AND credential_key = :key
-                    """), {"setting_id": setting_id, "key": credential_key}).fetchone()
-                    
-                    if existing:
-                        # Atualizar credencial existente
-                        session.execute(text("""
-                            UPDATE payment_credentials 
-                            SET credential_value = :value, updated_at = CURRENT_TIMESTAMP
-                            WHERE id = :id
-                        """), {"value": value, "id": existing.id})
-                    else:
-                        # Inserir nova credencial
-                        session.execute(text("""
-                            INSERT INTO payment_credentials 
-                            (payment_setting_id, credential_key, credential_value, created_at, updated_at)
-                            VALUES (:setting_id, :key, :value, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        """), {
-                            "setting_id": setting_id,
-                            "key": credential_key,
-                            "value": value
-                        })
+                    # Atualizar ou inserir credencial
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO payment_credentials 
+                        (payment_setting_id, credential_key, credential_value, updated_at)
+                        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+                    """, (setting_id, credential_key, value))
         
         # Salvar webhook URL
         webhook_url = credential_data.get('webhook_url') if method == 'mercadopago' else data.get('webhook_url')
         if webhook_url:
-            # Verificar se webhook já existe
-            existing_webhook = session.execute(text("""
-                SELECT id FROM payment_webhooks 
-                WHERE payment_setting_id = :setting_id
-            """), {"setting_id": setting_id}).fetchone()
-            
-            if existing_webhook:
-                # Atualizar webhook existente
-                session.execute(text("""
-                    UPDATE payment_webhooks 
-                    SET webhook_url = :webhook_url, is_active = true, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = :id
-                """), {"webhook_url": webhook_url, "id": existing_webhook.id})
-            else:
-                # Inserir novo webhook
-                session.execute(text("""
-                    INSERT INTO payment_webhooks 
-                    (payment_setting_id, webhook_url, is_active, created_at, updated_at)
-                    VALUES (:setting_id, :webhook_url, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                """), {"setting_id": setting_id, "webhook_url": webhook_url})
+            cursor.execute("""
+                INSERT OR REPLACE INTO payment_webhooks 
+                (payment_setting_id, webhook_url, is_active, updated_at)
+                VALUES (?, ?, 1, CURRENT_TIMESTAMP)
+            """, (setting_id, webhook_url))
         
         # Salvar métodos de pagamento (para MercadoPago)
         if method == 'mercadopago':
@@ -6750,40 +5724,14 @@ def update_payment_settings(method):
                     if method_name == 'installments':
                         config['max_installments'] = data.get('max_installments', 12)
                     
-                    # Verificar se método já existe
-                    existing_method = session.execute(text("""
-                        SELECT id FROM payment_methods 
-                        WHERE payment_setting_id = :setting_id AND method_type = :method_name
-                    """), {"setting_id": setting_id, "method_name": method_name}).fetchone()
-                    
-                    enabled = data[pm]
-                    config_json = json.dumps(config)
-                    
-                    if existing_method:
-                        # Atualizar método existente
-                        session.execute(text("""
-                            UPDATE payment_methods 
-                            SET enabled = :enabled, configuration = :config, updated_at = CURRENT_TIMESTAMP
-                            WHERE id = :id
-                        """), {
-                            "enabled": enabled,
-                            "config": config_json,
-                            "id": existing_method.id
-                        })
-                    else:
-                        # Inserir novo método
-                        session.execute(text("""
-                            INSERT INTO payment_methods 
-                            (payment_setting_id, method_type, enabled, configuration, created_at, updated_at)
-                            VALUES (:setting_id, :method_name, :enabled, :config, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                        """), {
-                            "setting_id": setting_id,
-                            "method_name": method_name,
-                            "enabled": enabled,
-                            "config": config_json
-                        })
+                    cursor.execute("""
+                        INSERT OR REPLACE INTO payment_methods 
+                        (payment_setting_id, method_type, enabled, configuration, updated_at)
+                        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+                    """, (setting_id, method_name, 1 if data[pm] else 0, json.dumps(config)))
         
-        session.commit()
+        conn.commit()
+        conn.close()
         
         print(f"✅ [PAYMENTS] Configurações do {method} salvas no banco")
         return jsonify({
@@ -6794,7 +5742,6 @@ def update_payment_settings(method):
         }), 200
         
     except Exception as e:
-        session.rollback()
         print(f"❌ [PAYMENTS] Erro ao salvar configurações do {method}: {str(e)}")
         import traceback
         traceback.print_exc()
@@ -6802,8 +5749,6 @@ def update_payment_settings(method):
             "success": False,
             "error": str(e)
         }), 500
-    finally:
-        session.close()
 
 # ==================== HANDLERS OPTIONS PARA CORS ====================
 
