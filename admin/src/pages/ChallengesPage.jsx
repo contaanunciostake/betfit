@@ -462,9 +462,6 @@ export default function ChallengesPage() {
     try {
       console.log('🎮 [CHALLENGES] Buscando desafios do banco SQLite...')
 
-      // Use a variável de ambiente
-      const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'https://betfit-backend.onrender.com'
-      
       // Então no início do arquivo, adicione:
       const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'https://betfit-backend.onrender.com'
 
