@@ -2749,7 +2749,7 @@ def get_challenges():
         categories_query = session.execute(text('''
             SELECT id, name, color, icon 
             FROM challenge_categories 
-            WHERE is_active = 1
+            WHERE is_active = '1'
         '''))
         categories_data = {row[0]: {'name': row[1], 'color': row[2], 'icon': row[3]} 
                           for row in categories_query.fetchall()}
@@ -4494,7 +4494,7 @@ def get_active_categories():
                 id, name, description, color, icon, 
                 is_active, created_at, updated_at
             FROM challenge_categories 
-            WHERE is_active = 1
+            WHERE is_active = '1'
             ORDER BY name
         ''')
         
