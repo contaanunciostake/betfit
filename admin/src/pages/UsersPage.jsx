@@ -61,6 +61,8 @@ export default function UsersPage() {
     pages: 0
   })
 
+  const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'https://betfit-backend.onrender.com'
+
   // Carregamento inicial
   useEffect(() => {
     let isMounted = true
@@ -72,7 +74,7 @@ export default function UsersPage() {
         setLoading(true)
         console.log('👥 [USERS] Carregamento inicial...')
         
-        const response = await fetch(`http://localhost:5001/api/users?page=1&limit=10&_t=${Date.now()}`)
+        const response = await fetch(`${API_BASE_URL}/api/users?page=1&limit=10&_t=${Date.now()}`)
         
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -132,7 +134,7 @@ export default function UsersPage() {
         params.append('status', statusFilter)
       }
 
-      const url = `http://localhost:5001/api/users?${params.toString()}`
+      const url = `${API_BASE_URL}/api/users?${params.toString()}`
       console.log('🔍 [USERS] URL de busca:', url)
 
       const response = await fetch(url)
@@ -180,7 +182,7 @@ export default function UsersPage() {
         params.append('status', statusFilter)
       }
 
-      const response = await fetch(`http://localhost:5001/api/users?${params.toString()}`)
+      const response = await fetch(`${API_BASE_URL}/api/users?${params.toString()}`)
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -213,7 +215,7 @@ export default function UsersPage() {
       setSearchLoading(true)
       console.log('🧹 [USERS] Limpando filtros...')
       
-      const response = await fetch(`http://localhost:5001/api/users?page=1&limit=10&_t=${Date.now()}`)
+      const response = await fetch(`${API_BASE_URL}/api/users?page=1&limit=10&_t=${Date.now()}`)
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -242,7 +244,7 @@ export default function UsersPage() {
     try {
       console.log(`👤 [USER] Alterando status do usuário ${userId} para: ${newStatus}`)
       
-      const response = await fetch(`http://localhost:5001/api/users/${userId}/status`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/${userId}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -284,7 +286,7 @@ export default function UsersPage() {
       const amount = parseFloat(balanceAmount)
       console.log(`💰 [BALANCE] Adicionando R$ ${amount.toFixed(2)} ao usuário ${addBalanceUser.id} (${addBalanceUser.name})`)
       
-      const response = await fetch(`http://localhost:5001/api/users/${addBalanceUser.id}/balance`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/${addBalanceUser.id}/balance`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
