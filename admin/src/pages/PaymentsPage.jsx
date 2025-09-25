@@ -36,6 +36,8 @@ import {
   X
 } from 'lucide-react'
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'https://betfit-backend.onrender.com'
+
 export default function PaymentsPage() {
   const [paymentSettings, setPaymentSettings] = useState(null)
   const [transactions, setTransactions] = useState([])
@@ -45,6 +47,8 @@ export default function PaymentsPage() {
   const [connectionStatus, setConnectionStatus] = useState('connecting')
   const [error, setError] = useState(null)
   const [successMessage, setSuccessMessage] = useState(null)
+
+  
 
   // Função para mostrar mensagens temporárias
   const showMessage = (message, type = 'success') => {
@@ -102,7 +106,7 @@ export default function PaymentsPage() {
         console.log('🔍 [PAYMENTS] Iniciando busca de dados de pagamento...')
         
         const [settingsResponse, transactionsResponse] = await Promise.all([
-          fetch('http://localhost:5001/api/admin/payments/settings', {
+          fetch(`${API_BASE_URL}/api/admin/payments/settings`, {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
@@ -110,7 +114,7 @@ export default function PaymentsPage() {
               // 'Authorization': `Bearer ${token}`
             }
           }),
-          fetch('http://localhost:5001/api/admin/payments/transactions', {
+          fetch(`${API_BASE_URL}/api/admin/payments/transactions`, {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
@@ -365,7 +369,7 @@ export default function PaymentsPage() {
       const newEnabledState = !paymentSettings[method].enabled
       console.log(`🔄 [PAYMENTS] Alterando ${method}: ${paymentSettings[method].enabled} → ${newEnabledState}`)
       
-      const response = await fetch(`http://localhost:5001/api/admin/payments/methods/${method}/toggle`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/payments/methods/${method}/toggle`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
@@ -417,7 +421,7 @@ export default function PaymentsPage() {
       
       console.log(`🔄 [PAYMENTS] Atualizando configurações de ${method}:`, settings)
       
-      const response = await fetch(`http://localhost:5001/api/admin/payments/settings/${method}`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/payments/settings/${method}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
