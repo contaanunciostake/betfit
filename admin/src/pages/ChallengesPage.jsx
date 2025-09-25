@@ -463,13 +463,13 @@ export default function ChallengesPage() {
       console.log('🎮 [CHALLENGES] Buscando desafios do banco SQLite...')
       
       // Tentar endpoint admin primeiro
-      let response = await fetch(`http://localhost:5001/api/admin/challenges/simple-real?_t=${Date.now()}`)
+      let response = await fetch(`${API_BASE_URL}/api/admin/challenges/simple-real?_t=${Date.now()}`)
       
       if (!response.ok) {
         console.warn('⚠️ [CHALLENGES] Endpoint admin não disponível, usando fallback...')
         
         // Fallback para endpoint principal
-        response = await fetch(`http://localhost:5001/api/challenges?_t=${Date.now()}`)
+        response = await fetch(`${API_BASE_URL}/api/challenges?_t=${Date.now()}`)
         
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -525,7 +525,7 @@ export default function ChallengesPage() {
   // CARREGAR CATEGORIAS
   const loadCategories = async () => {
     try {
-      const response = await fetch(`http://localhost:5001/api/categories?_t=${Date.now()}`)
+      const response = await fetch(`${API_BASE_URL}/api/categories?_t=${Date.now()}`)
       
       if (response.ok) {
         const data = await response.json()
@@ -686,7 +686,7 @@ export default function ChallengesPage() {
 
       console.log('📤 [CHALLENGES] Enviando dados:', challengeData)
 
-      const response = await fetch('http://localhost:5001/api/challenges', {
+      const response = await fetch(`${API_BASE_URL}/api/challenges`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
