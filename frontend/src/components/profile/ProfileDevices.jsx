@@ -488,8 +488,182 @@ const ProfileDevices = ({ devices = [], onConnectDevice, onDisconnectDevice }) =
   };
 
   const connectStrava = async (device) => {
-    throw new Error('Strava ainda não implementado nesta versão');
+  try {
+    console.log('🚴 [CONNECT_STRAVA] Iniciando conexão com Strava...');
+    
+    // 1. Verificar se está no navegador
+    if (isNativeApp()) {
+      throw new Error('Strava deve ser conectado através do navegador web');
+    }
+
+    // 2. Preparar URL de autorização do Strava
+    const stravaAuthUrl = `https://www.strava.com/oauth/authorize?` +
+      `client_id=${process.env.REACT_APP_STRAVA_CLIENT_ID || '134893'}` +
+      `&redirect_uri=${encodeURIComponent('https://betfit-backend.onrender.com/api/auth/strava/callback')}` +
+      `&response_type=code` +
+      `&scope=read,activity:read` +
+      `&state=${btoa(JSON.stringify({ user_email: user.email, return_url: window.location.href }))}`;
+
+    console.log('🔗 [CONNECT_STRAVA] URL de autorização:', stravaAuthUrl);
+
+    // 3. Armazenar dados temporários para callback
+    localStorage.setItem('strava_connection_pending', JSON.stringify({
+      user_email: user.email,
+      started_at: Date.now(),
+      device_type: 'strava'
+    }));
+
+    // 4. Abrir popup ou redirecionar para Strava
+    const popup = window.open(
+      stravaAuthUrl,
+      'strava-auth',
+      'width=600,height=700,scrollbars=yes,resizable=yes'
+    );
+
+    // 5. Monitorar fechamento do popup
+    const checkClosed = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(checkClosed);
+        console.log('🔗 [CONNECT_STRAVA] Popup fechado, verificando resultado...');
+        
+        // Verificar se a conexão foi bem-sucedida
+        setTimeout(async () => {
+          await checkStravaConnectionResult();
+        }, 2000);
+      }
+    }, 1000);
+
+    // 6. Timeout de segurança
+    setTimeout(() => {
+      if (!popup.closed) {
+        popup.close();
+        clearInterval(checkClosed);
+        throw new Error('Tempo limite de autorização excedido');
+      }
+    }, 300000); // 5 minutos
+
+  } catch (error) {
+    console.error('❌ [CONNECT_STRAVA] Erro:', error);
+    throw error;
+  }
+};
+
+// Função para verificar resultado da conexão
+const checkStravaConnectionResult = async () => {
+  try {
+    const pendingData = localStorage.getItem('strava_connection_pending');
+    if (!pendingData) return;
+
+    const pending = JSON.parse(pendingData);
+    
+    // Verificar se a conexão foi criada no backend
+    const token = localStorage.getItem('token');
+    const response = await fetch(`https://betfit-backend.onrender.com/api/fitness/connections/${user.email}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const stravaConnection = data.connections.find(conn => 
+        conn.platform === 'strava' && 
+        conn.is_active
+      );
+
+      if (stravaConnection) {
+        // Conexão bem-sucedida
+        localStorage.removeItem('strava_connection_pending');
+        await loadFitnessConnections(true);
+        setSuccess('Strava conectado com sucesso! Suas atividades serão sincronizadas automaticamente.');
+        
+        // Iniciar sincronização
+        startStravaSync(user.email);
+      } else {
+        // Conexão falhou
+        setError('Falha ao conectar com Strava. Tente novamente.');
+      }
+    }
+
+  } catch (error) {
+    console.error('❌ [CHECK_STRAVA] Erro ao verificar conexão:', error);
+    setError('Erro ao verificar conexão com Strava');
+  }
+};
+
+// Função para iniciar sincronização periódica
+const startStravaSync = (userEmail) => {
+  console.log('🔄 [STRAVA_SYNC] Iniciando sincronização para:', userEmail);
+  
+  // Sincronizar imediatamente
+  syncStravaActivities(userEmail);
+  
+  // Agendar sincronizações regulares (a cada 10 minutos)
+  const intervalId = setInterval(() => {
+    syncStravaActivities(userEmail);
+  }, 600000); // 10 minutos
+
+  localStorage.setItem(`strava_sync_${userEmail}`, intervalId.toString());
+};
+
+// Função para sincronizar atividades do Strava
+const syncStravaActivities = async (userEmail) => {
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch('https://betfit-backend.onrender.com/api/fitness/strava/sync', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        user_email: userEmail
+      })
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log('✅ [STRAVA_SYNC] Sincronização concluída:', result);
+      
+      // Verificar se completou algum desafio
+      if (result.challenge_completions && result.challenge_completions.length > 0) {
+        result.challenge_completions.forEach(completion => {
+          setSuccess(
+            `🏆 Parabéns! Você completou "${completion.challenge_title}" e ganhou R$ ${completion.prize_amount.toFixed(2)}!`
+          );
+        });
+      }
+      
+      return result;
+    } else {
+      console.warn('⚠️ [STRAVA_SYNC] Falha na sincronização:', response.status);
+    }
+
+  } catch (error) {
+    console.error('❌ [STRAVA_SYNC] Erro na sincronização:', error);
+  }
+};
+
+// Parar sincronização do Strava
+const stopStravaSync = (userEmail) => {
+  const intervalId = localStorage.getItem(`strava_sync_${userEmail}`);
+  if (intervalId) {
+    clearInterval(parseInt(intervalId));
+    localStorage.removeItem(`strava_sync_${userEmail}`);
+    console.log('⏹️ [STRAVA_SYNC] Sincronização parada para:', userEmail);
+  }
+};
+
+// Adicionar ao useEffect de cleanup:
+useEffect(() => {
+  return () => {
+    if (user?.email) {
+      stopMockActivitySimulation(user.email);
+      stopStravaSync(user.email);
+    }
   };
+}, [user?.email]);
 
   // Desconectar dispositivo
   const handleDisconnectDevice = async (device) => {
