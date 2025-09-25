@@ -77,6 +77,8 @@ if not cors_origins or cors_origins == ['']:
         "https://betfit-front.loca.lt",
         "https://betfit-api.loca.lt",
         "https://e6270cb05b48.ngrok-free.app"
+        "https://betfit-backend.onrender.com"
+        "https://betfit-frontend-thwz.onrender.com"
     ]
 
 CORS(app,
@@ -130,6 +132,8 @@ def serve_logo(filename):
     "https://finances-gathering-eyes-del.trycloudflare.com",
     "https://betfit-front.loca.lt", 
     "https://betfit-api.loca.lt"
+    "https://betfit-backend.onrender.com"
+    "https://betfit-frontend-thwz.onrender.com"
 ])
 def get_public_settings():
     """
