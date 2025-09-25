@@ -5825,7 +5825,7 @@ if __name__ == '__main__':
     if is_production:
         print("🚀 Iniciando BetFit Backend - PRODUÇÃO RENDER")
         print(f"🌐 Porta: {port}")
-        print(f"💾 Database: {DATABASE_PATH}")
+        print(f"💾 Database: PostgreSQL (Render)")
         print("📊 Banco de dados: SQLite com SQLAlchemy")
         
         # Configurações de produção
