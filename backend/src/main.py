@@ -473,7 +473,7 @@ def initialize_mercadopago():
     
     try:
         # Carregar credenciais do banco de dados
-        conn = sqlite3.connect(DATABASE_PATH)
+        conn = psycopg2.connect(DATABASE_URL)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -517,7 +517,7 @@ def get_payments_config():
         print("🔍 [CONFIG] Buscando public_key do MercadoPago...")
         
         # Buscar as credenciais do banco de dados usando sqlite3 direto
-        conn = sqlite3.connect(DATABASE_PATH)
+        conn = psycopg2.connect(DATABASE_URL)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -2761,7 +2761,7 @@ def get_challenges():
         categories_query = session.execute(text('''
             SELECT id, name, color, icon 
             FROM challenge_categories 
-            WHERE is_active = 1
+            WHERE is_active = 'true' OR is_active = '1'
         '''))
         categories_data = {row[0]: {'name': row[1], 'color': row[2], 'icon': row[3]} 
                           for row in categories_query.fetchall()}
@@ -4187,7 +4187,7 @@ def add_user_balance(user_id):
 
 def get_db_connection():
     """Conecta ao banco de dados"""
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = psycopg2.connect(DATABASE_URL)
     conn.row_factory = sqlite3.Row  # Para acessar colunas por nome
     return conn
 
@@ -4506,7 +4506,7 @@ def get_active_categories():
                 id, name, description, color, icon, 
                 is_active, created_at, updated_at
             FROM challenge_categories 
-            WHERE is_active = 1
+            
             ORDER BY name
         ''')
         
@@ -5207,7 +5207,7 @@ def debug_database_structure():
     Endpoint para debugar a estrutura do banco de dados
     """
     try:
-        conn = sqlite3.connect(DATABASE_PATH)
+        conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
         
         # Verificar estrutura da tabela challenges
@@ -5287,7 +5287,7 @@ def force_refresh_challenges():
 def get_payment_settings():
     """Obter configurações de pagamento do banco SQLite - VERSÃO CORRIGIDA"""
     try:
-        conn = sqlite3.connect(DATABASE_PATH)
+        conn = psycopg2.connect(DATABASE_URL)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -5529,7 +5529,7 @@ def get_payment_settings():
 def get_transactions():
     """Obter transações de pagamento do banco SQLite"""
     try:
-        conn = sqlite3.connect(DATABASE_PATH)
+        conn = psycopg2.connect(DATABASE_URL)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -5611,7 +5611,7 @@ def get_transactions():
 def toggle_payment_method(method):
     """Alternar status de método de pagamento no banco SQLite"""
     try:
-        conn = sqlite3.connect(DATABASE_PATH)
+        conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
         
         print(f"🔄 [PAYMENTS] Alternando status do método: {method}")
@@ -5662,7 +5662,7 @@ def update_payment_settings(method):
     try:
         data = request.get_json()
         
-        conn = sqlite3.connect(DATABASE_PATH)
+        conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
         
         print(f"💾 [PAYMENTS] Salvando configurações do {method}:", data)
