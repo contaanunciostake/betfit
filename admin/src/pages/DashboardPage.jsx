@@ -13,6 +13,8 @@ import {
 } from 'lucide-react'
 import { useAdmin } from '../contexts/AdminContext'
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'https://betfit-backend.onrender.com'
+
 export default function DashboardPage() {
   const { apiCall } = useAdmin()
   const [stats, setStats] = useState(null)
@@ -32,7 +34,7 @@ export default function DashboardPage() {
         console.log('🔍 [DASHBOARD] Iniciando busca de métricas...')
         
         // Fazer chamada direta para a API
-        const response = await fetch('http://localhost:5001/api/admin/dashboard/metrics')
+        const response = await fetch(`${API_BASE_URL}/api/admin/dashboard/metrics`)
         
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`)
