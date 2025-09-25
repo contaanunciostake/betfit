@@ -25,7 +25,7 @@ export default function SettingsPage() {
     notifications: {},
     platform: {}
   })
-  
+  const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'https://betfit-backend.onrender.com'
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -34,7 +34,7 @@ export default function SettingsPage() {
     const loadInitialSettings = async () => {
       setLoading(true)
       try {
-        const response = await fetch('http://localhost:5001/api/admin/settings')
+        const response = await fetch(`${API_BASE_URL}/api/admin/settings`)
         if (response.ok) {
           const data = await response.json()
           console.log('Configurações carregadas:', data.settings)
@@ -69,13 +69,13 @@ export default function SettingsPage() {
           formData.append(key, data[key]);
         }
         
-        response = await fetch(`http://localhost:5001/api/admin/settings/${section}`, {
+        response = await fetch(`${API_BASE_URL}/api/admin/settings/${section}`, {
           method: 'PUT',
           body: formData,
         });
 
       } else {
-        response = await fetch(`http://localhost:5001/api/admin/settings/${section}`, {
+        response = await fetch(`${API_BASE_URL}/api/admin/settings/${section}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
@@ -83,7 +83,7 @@ export default function SettingsPage() {
       }
 
       if (response.ok) {
-        const updatedSettings = await fetch('http://localhost:5001/api/admin/settings');
+        const updatedSettings = await fetch(`${API_BASE_URL}/api/admin/settings`);
         const updatedData = await updatedSettings.json();
         if (updatedData.settings) {
             setSettings(prev => ({ ...prev, ...updatedData.settings }));
@@ -245,7 +245,7 @@ function GeneralSettings({ settings, onSave, saving }) {
     if (colorLogo) {
       const fullUrl = colorLogo.startsWith('http') 
         ? colorLogo
-        : `http://localhost:5001${colorLogo}`;
+        : `${API_BASE_URL}${colorLogo}`;
       previews.color = fullUrl;
       console.log('Preview color logo:', fullUrl);
     }
@@ -254,7 +254,7 @@ function GeneralSettings({ settings, onSave, saving }) {
     if (settings.platform_logo_white) {
       const fullUrl = settings.platform_logo_white.startsWith('http') 
         ? settings.platform_logo_white
-        : `http://localhost:5001${settings.platform_logo_white}`;
+        : `${API_BASE_URL}${settings.platform_logo_white}`;
       previews.white = fullUrl;
       console.log('Preview white logo:', fullUrl);
     }
@@ -263,7 +263,7 @@ function GeneralSettings({ settings, onSave, saving }) {
     if (settings.platform_logo_black) {
       const fullUrl = settings.platform_logo_black.startsWith('http') 
         ? settings.platform_logo_black
-        : `http://localhost:5001${settings.platform_logo_black}`;
+        : `${API_BASE_URL}${settings.platform_logo_black}`;
       previews.black = fullUrl;
       console.log('Preview black logo:', fullUrl);
     }
@@ -327,7 +327,7 @@ function GeneralSettings({ settings, onSave, saving }) {
         });
 
         try {
-          const response = await fetch('http://localhost:5001/api/admin/settings/general', {
+          const response = await fetch(`${API_BASE_URL}/api/admin/settings/general`, {
             method: 'PUT',
             body: formDataToSend
           });
