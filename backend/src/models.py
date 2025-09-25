@@ -6,6 +6,7 @@ from sqlalchemy.orm import sessionmaker, relationship
 import datetime
 import uuid
 import json
+import os
 
 Base = declarative_base()
 
@@ -452,8 +453,16 @@ class GlobalActivity(Base):
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
 
-# Configuração do banco
-engine = create_engine('sqlite:///c:/Temp/BetFit/backend/src/betfit.db', connect_args={"check_same_thread": False})
+    # Configuração do banco - PostgreSQL em produção, SQLite em desenvolvimento
+DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///c:/Temp/BetFit/backend/src/betfit.db')
+
+if DATABASE_URL.startswith('postgresql'):
+    # PostgreSQL - sem check_same_thread
+    engine = create_engine(DATABASE_URL)
+else:
+    # SQLite - com check_same_thread=False
+    engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+
 SessionLocal = sessionmaker(bind=engine)
 
 # Criar todas as tabelas
