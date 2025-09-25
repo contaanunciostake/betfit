@@ -561,6 +561,210 @@ def check_challenge_completion(session, user_id, fitness_data):
     
     return completions
 
+@app.route('/api/strava/webhook', methods=['GET', 'POST'])
+def strava_webhook():
+    """Receber notificações em tempo real do Strava"""
+    
+    if request.method == 'GET':
+        # Verificação inicial do webhook (Strava vai chamar isso primeiro)
+        challenge = request.args.get('hub.challenge')
+        verify_token = request.args.get('hub.verify_token')
+        
+        print(f"🔍 [WEBHOOK] Verificação: token={verify_token}, challenge={challenge}")
+        
+        # Use um token que você definir nas variáveis de ambiente
+        if verify_token == os.getenv('STRAVA_WEBHOOK_VERIFY_TOKEN'):
+            print("✅ [WEBHOOK] Token verificado com sucesso!")
+            return jsonify({'hub.challenge': challenge})
+        
+        print("❌ [WEBHOOK] Token inválido!")
+        return 'Forbidden', 403
+    
+    elif request.method == 'POST':
+        try:
+            data = request.get_json()
+            print(f"🎯 [WEBHOOK] Evento recebido: {data}")
+            
+            # Verificar se é uma nova atividade criada
+            if (data.get('object_type') == 'activity' and 
+                data.get('aspect_type') == 'create'):
+                
+                athlete_id = data.get('owner_id')
+                activity_id = data.get('object_id')
+                
+                print(f"🏃 [WEBHOOK] Nova atividade detectada!")
+                print(f"👤 Atleta ID: {athlete_id}")
+                print(f"🏃 Atividade ID: {activity_id}")
+                
+                # Processar atividade IMEDIATAMENTE
+                process_strava_activity_webhook(athlete_id, activity_id)
+            
+            return jsonify({'status': 'EVENT_RECEIVED'}), 200
+            
+        except Exception as e:
+            print(f"❌ [WEBHOOK] Erro processando evento: {e}")
+            return jsonify({'error': str(e)}), 500
+
+def process_strava_activity_webhook(athlete_id, activity_id):
+    """Processar atividade do webhook em tempo real"""
+    session = SessionLocal()
+    try:
+        print(f"🔍 [WEBHOOK] Buscando conexão para atleta {athlete_id}...")
+        
+        # Encontrar a conexão do usuário pelo athlete_id
+        connection = session.query(FitnessConnection).filter_by(
+            platform='strava',
+            platform_user_id=str(athlete_id),
+            is_active=True
+        ).first()
+        
+        if not connection:
+            print(f"⚠️ [WEBHOOK] Conexão não encontrada para atleta {athlete_id}")
+            return
+        
+        print(f"✅ [WEBHOOK] Conexão encontrada! Usuário: {connection.user_id}")
+        
+        # Buscar detalhes da atividade específica no Strava
+        headers = {'Authorization': f'Bearer {connection.access_token}'}
+        print(f"🌐 [WEBHOOK] Buscando detalhes da atividade {activity_id}...")
+        
+        activity_response = requests.get(
+            f'https://www.strava.com/api/v3/activities/{activity_id}',
+            headers=headers
+        )
+        
+        if activity_response.status_code != 200:
+            print(f"❌ [WEBHOOK] Erro ao buscar atividade: {activity_response.status_code}")
+            print(f"Response: {activity_response.text}")
+            return
+        
+        activity = activity_response.json()
+        activity_name = activity.get('name', 'Atividade sem nome')
+        distance_km = activity.get('distance', 0) / 1000
+        activity_type = activity.get('type', 'Unknown')
+        
+        print(f"🏃 [WEBHOOK] Atividade obtida:")
+        print(f"  📝 Nome: {activity_name}")
+        print(f"  🏃 Tipo: {activity_type}")
+        print(f"  📏 Distância: {distance_km:.2f} km")
+        
+        # Verificar se já foi processada
+        existing_data = session.query(FitnessData).filter_by(
+            user_id=connection.user_id,
+            external_id=str(activity_id)
+        ).first()
+        
+        if existing_data:
+            print(f"⚠️ [WEBHOOK] Atividade {activity_id} já foi processada")
+            return
+        
+        # Criar registro de dados fitness
+        fitness_data = FitnessData(
+            id=str(uuid.uuid4()),
+            user_id=connection.user_id,
+            connection_id=connection.id,
+            external_id=str(activity_id),
+            data_type=map_strava_type(activity['type']),
+            value=distance_km,
+            unit='km',
+            start_time=datetime.fromisoformat(activity['start_date'].replace('Z', '+00:00')),
+            end_time=datetime.fromisoformat(activity['start_date'].replace('Z', '+00:00')) + 
+                    timedelta(seconds=activity.get('elapsed_time', 0)),
+            source_app='strava',
+            raw_data=json.dumps(activity)
+        )
+        
+        session.add(fitness_data)
+        print(f"💾 [WEBHOOK] Dados de fitness salvos")
+        
+        # ⚡ VERIFICAR DESAFIOS IMEDIATAMENTE ⚡
+        print(f"🏆 [WEBHOOK] Verificando desafios para usuário {connection.user_id}...")
+        completed_challenges = check_challenge_completion_webhook(session, connection.user_id, fitness_data)
+        
+        session.commit()
+        
+        # Notificar se completou algum desafio
+        if completed_challenges:
+            print(f"🎉 [WEBHOOK] 🏆 DESAFIOS COMPLETADOS: {len(completed_challenges)} 🏆")
+            for completion in completed_challenges:
+                print(f"🏆 [WEBHOOK] ✨ PARABÉNS! Desafio completado:")
+                print(f"    🎯 Desafio: {completion['challenge_title']}")
+                print(f"    💰 Prêmio: R$ {completion['prize_amount']:.2f}")
+                print(f"    ⏰ Concluído em: {completion.get('completed_at', 'Agora')}")
+        else:
+            print(f"📊 [WEBHOOK] Nenhum desafio completado desta vez")
+        
+    except Exception as e:
+        print(f"❌ [WEBHOOK] Erro crítico processando atividade: {e}")
+        import traceback
+        traceback.print_exc()
+        session.rollback()
+    finally:
+        session.close()
+
+def check_challenge_completion_webhook(session, user_id, fitness_data):
+    """Verificar conclusão de desafios via webhook (tempo real)"""
+    completions = []
+    
+    # Buscar participações ativas do usuário
+    participations = session.query(ChallengeParticipation).filter_by(
+        user_id=user_id,
+        status='active'
+    ).all()
+    
+    print(f"🔍 [WEBHOOK] Encontradas {len(participations)} participações ativas")
+    
+    for participation in participations:
+        challenge = session.query(Challenge).filter_by(id=participation.challenge_id).first()
+        
+        if not challenge or challenge.status != 'active':
+            print(f"⚠️ [WEBHOOK] Desafio {participation.challenge_id} não está ativo")
+            continue
+        
+        print(f"🎯 [WEBHOOK] Verificando desafio: {challenge.title}")
+        print(f"📊 [WEBHOOK] Meta: {challenge.target_value} {challenge.target_metric}")
+        print(f"📊 [WEBHOOK] Atividade: {fitness_data.value} {fitness_data.data_type}")
+        
+        # ⚡ Verificar se a atividade completa o desafio ⚡
+        if (challenge.target_metric == fitness_data.data_type and 
+            fitness_data.value >= challenge.target_value):
+            
+            print(f"🏆 [WEBHOOK] 🎉 DESAFIO COMPLETADO! 🎉")
+            
+            # Marcar participação como completada
+            participation.status = 'completed'
+            participation.completed_at = datetime.utcnow()
+            participation.result_value = fitness_data.value
+            
+            # Calcular e creditar prêmio
+            prize_amount = calculate_prize(session, challenge)
+            
+            # Atualizar carteira do usuário
+            wallet = session.query(Wallet).filter_by(user_id=user_id).first()
+            if wallet:
+                old_balance = wallet.balance
+                wallet.balance += prize_amount
+                wallet.updated_at = datetime.utcnow()
+                print(f"💰 [WEBHOOK] Carteira atualizada:")
+                print(f"    💰 Saldo anterior: R$ {old_balance:.2f}")
+                print(f"    💰 Prêmio: R$ {prize_amount:.2f}")
+                print(f"    💰 Novo saldo: R$ {wallet.balance:.2f}")
+            
+            # Finalizar desafio (primeiro a completar vence)
+            challenge.status = 'completed'
+            challenge.updated_at = datetime.utcnow()
+            print(f"🏁 [WEBHOOK] Desafio '{challenge.title}' finalizado!")
+            
+            completions.append({
+                'challenge_id': challenge.id,
+                'challenge_title': challenge.title,
+                'prize_amount': prize_amount,
+                'completed_at': datetime.utcnow().isoformat(),
+                'result_value': fitness_data.value
+            })
+    
+    return completions
+
 @app.route('/api/admin/settings/<section>/<key>', methods=['GET', 'PUT', 'OPTIONS'])
 @cross_origin(origins=["http://localhost:3000", "http://localhost:5173", "http://localhost:8080", "http://192.168.1.69:8080", "http://localhost:5174", "http://localhost:5001"])
 def handle_single_setting(section, key):
