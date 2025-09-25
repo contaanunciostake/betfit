@@ -519,87 +519,82 @@ const loadCategoriesFromDatabase = async () => {
 
   // Filter challenges by category and status
   const filteredChallenges = () => {
-    const challengesToUse = realChallenges.length > 0 ? realChallenges : contextChallenges;
-    if (!challengesToUse) return [];
-    
-    // First filter by category
-    let filtered = challengesToUse;
-    if (selectedCategory !== 'all') {
-      filtered = challengesToUse.filter(challenge => {
-        const challengeCategory = (challenge.category || challenge.category_name || '').toLowerCase();
-        const selectedCategoryLower = selectedCategory.toLowerCase();
-        
-        if (challengeCategory === selectedCategoryLower) return true;
-        
-        const categoryMappings = {
-          'caminhada': ['walking', 'steps', 'passos'],
-          'corrida': ['running', 'run'],
-          'ciclismo': ['cycling', 'bike'],
-          'fitness': ['workouts', 'treinos', 'fitness'],
-          'natação': ['swimming', 'swim'],
-          'yoga': ['yoga', 'meditation'],
-          'voador': ['flying', 'voador']
-        };
-        
-        for (const [key, alternatives] of Object.entries(categoryMappings)) {
-          if (selectedCategoryLower === key && alternatives.includes(challengeCategory)) return true;
-          if (alternatives.includes(selectedCategoryLower) && challengeCategory === key) return true;
-        }
-        
-        return false;
-      });
-    }
+  const challengesToUse = realChallenges.length > 0 ? realChallenges : contextChallenges;
+  if (!challengesToUse) return [];
+  
+  // First filter by category
+  let filtered = challengesToUse;
+  if (selectedCategory !== 'all') {
+    filtered = challengesToUse.filter(challenge => {
+      const challengeCategory = (challenge.category || challenge.category_name || '').toLowerCase();
+      const selectedCategoryLower = selectedCategory.toLowerCase();
+      
+      if (challengeCategory === selectedCategoryLower) return true;
+      
+      const categoryMappings = {
+        'caminhada': ['walking', 'steps', 'passos'],
+        'corrida': ['running', 'run'],
+        'ciclismo': ['cycling', 'bike'],
+        'fitness': ['workouts', 'treinos', 'fitness'],
+        'natação': ['swimming', 'swim'],
+        'yoga': ['yoga', 'meditation'],
+        'voador': ['flying', 'voador']
+      };
+      
+      for (const [key, alternatives] of Object.entries(categoryMappings)) {
+        if (selectedCategoryLower === key && alternatives.includes(challengeCategory)) return true;
+        if (alternatives.includes(selectedCategoryLower) && challengeCategory === key) return true;
+      }
+      
+      return false;
+    });
+  }
 
     // Then filter by status/tab
     return filtered.filter(challenge => {
-      const now = new Date();
-      const endDateStr = challenge.end_date.includes('Z') ? challenge.end_date : challenge.end_date + 'Z';
-      const endDate = new Date(endDateStr);
-      const endDateBR = new Date(endDate.getTime() - (3 * 60 * 60 * 1000));
-      const isExpired = endDateBR.getTime() <= now.getTime();
-      const isCompleted = challenge.status === 'completed' || challenge.status === 'finished';
-      
-      switch (activeTab) {
-        case 'available':
-          return !isExpired && !isCompleted && challenge.status !== 'pending';
-        case 'my_active':
-          // Show only challenges the user is actively participating in
-          return isUserParticipating(challenge.id);
-        default:
-          return !isExpired && !isCompleted && challenge.status !== 'pending';
-      }
-    });
-  };
+    const status = challenge.status || 'active';
+    
+    switch (activeTab) {
+      case 'available':
+        // INCLUIR tanto 'active' quanto 'pending' (agendados)
+        return status === 'active' || status === 'pending';
+        
+      case 'my_active':
+        // Show only challenges the user is actively participating in
+        return isUserParticipating(challenge.id);
+        
+      default:
+        // INCLUIR tanto 'active' quanto 'pending' por padrão
+        return status === 'active' || status === 'pending';
+    }
+  });
+};
+
 
   // Get challenge counts for each tab
-  const getChallengeStats = () => {
-    const challengesToUse = realChallenges.length > 0 ? realChallenges : contextChallenges;
-    if (!challengesToUse) return { available: 0, my_active: 0 };
+ const getChallengeStats = () => {
+  const challengesToUse = realChallenges.length > 0 ? realChallenges : contextChallenges;
+  if (!challengesToUse) return { available: 0, my_active: 0 };
+  
+  let available = 0, my_active = 0;
+  
+  challengesToUse.forEach(challenge => {
+    const status = challenge.status || 'active';
     
-    let available = 0, my_active = 0;
+    // Count user's active challenges
+    if (isUserParticipating(challenge.id)) {
+      my_active++;
+    }
     
-    challengesToUse.forEach(challenge => {
-      const now = new Date();
-      const endDateStr = challenge.end_date.includes('Z') ? challenge.end_date : challenge.end_date + 'Z';
-      const endDate = new Date(endDateStr);
-      const endDateBR = new Date(endDate.getTime() - (3 * 60 * 60 * 1000));
-      const isExpired = endDateBR.getTime() <= now.getTime();
-      const isCompleted = challenge.status === 'completed' || challenge.status === 'finished';
-      
-      // Count user's active challenges
-      if (isUserParticipating(challenge.id)) {
-        my_active++;
-      }
-      
-      // Count available challenges
-      if (!isExpired && !isCompleted && challenge.status !== 'pending') {
-        available++;
-      }
-    });
-    
-    return { available, my_active };
-  };
-
+    // Count available challenges (INCLUIR PENDING)
+    if (status === 'active' || status === 'pending') {
+      available++;
+    }
+  });
+  
+  return { available, my_active };
+};
+  
   // Debug filtered challenges
   useEffect(() => {
     const filtered = filteredChallenges();
