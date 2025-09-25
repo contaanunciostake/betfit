@@ -16,6 +16,8 @@ import {
 } from '@/components/ui/dialog'
 import { Plus, Tags, Edit, Trash2, Loader2, AlertCircle, CheckCircle, RefreshCw } from 'lucide-react'
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'https://betfit-backend.onrender.com'
+
 // COMPONENTE DO FORMULÁRIO SEPARADO - Para evitar re-renders
 const CreateCategoryForm = ({ onSuccess, onCancel }) => {
   const [formData, setFormData] = useState({
@@ -44,7 +46,7 @@ const CreateCategoryForm = ({ onSuccess, onCancel }) => {
           throw new Error('Nome e descrição são obrigatórios')
         }
 
-        const response = await fetch('http://localhost:5001/api/categories', {
+        const response = await fetch(`${API_BASE_URL}/api/categories`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -193,7 +195,7 @@ const EditCategoryForm = ({ category, onSuccess, onCancel }) => {
           throw new Error('Nome e descrição são obrigatórios')
         }
 
-        const response = await fetch(`http://localhost:5001/api/categories/${category.id}`, {
+        const response = await fetch(`${API_BASE_URL}/api/categories/${category.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -339,7 +341,7 @@ export default function CategoriesPage() {
         
         console.log('🏷️ [CATEGORIES] Carregando categorias do banco de dados...')
         
-        const response = await fetch(`http://localhost:5001/api/categories?_t=${Date.now()}`)
+        const response = await fetch(`${API_BASE_URL}/api/categories?_t=${Date.now()}`)
         
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -352,7 +354,7 @@ export default function CategoriesPage() {
         
         // Processar dados do banco
         const categoriesData = data.categories || []
-        const challengesResponse = await fetch(`http://localhost:5001/api/challenges?_t=${Date.now()}`)
+        const challengesResponse = await fetch(`${API_BASE_URL}/api/challenges?_t=${Date.now()}`)
         const challengesData = await challengesResponse.json()
         const challenges = challengesData.challenges || []
 
@@ -423,7 +425,7 @@ export default function CategoriesPage() {
     try {
       console.log('🔄 [CATEGORIES] Recarregando categorias do banco...')
       
-      const response = await fetch(`http://localhost:5001/api/categories?_t=${Date.now()}`)
+      const response = await fetch(`${API_BASE_URL}/api/categories?_t=${Date.now()}`)
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`)
@@ -499,7 +501,7 @@ export default function CategoriesPage() {
     try {
       console.log('🗑️ [CATEGORIES] Removendo categoria do banco:', category.id)
       
-      const response = await fetch(`http://localhost:5001/api/categories/${category.id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/categories/${category.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token') || 'dummy-token'}`
@@ -534,7 +536,7 @@ const handleActivateCategory = async (category) => {
   try {
     console.log('🔄 [CATEGORIES] Reativando categoria no banco:', category.id)
     
-    const response = await fetch(`http://localhost:5001/api/categories/${category.id}/activate`, {
+    const response = await fetch(`${API_BASE_URL}/api/categories/${category.id}/activate`, {
       method: 'PUT',
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('token') || 'dummy-token'}`
