@@ -561,6 +561,40 @@ def check_challenge_completion(session, user_id, fitness_data):
     
     return completions
 
+@app.route('/api/fitness/connections/<email>', methods=['GET'])
+def get_fitness_connections(email):
+    """Obter conexões de fitness de um usuário"""
+    session = SessionLocal()
+    try:
+        user = session.query(User).filter_by(email=email).first()
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+        
+        connections = session.query(FitnessConnection).filter_by(
+            user_id=user.id,
+            is_active=True
+        ).all()
+        
+        connections_data = []
+        for conn in connections:
+            connections_data.append({
+                'id': conn.id,
+                'platform': conn.platform,
+                'is_active': conn.is_active,
+                'connected_at': conn.created_at.isoformat() if conn.created_at else None,
+                'last_sync': conn.updated_at.isoformat() if conn.updated_at else None
+            })
+        
+        return jsonify({
+            'success': True,
+            'connections': connections_data
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
 @app.route('/api/strava/webhook', methods=['GET', 'POST'])
 def strava_webhook():
     """Receber notificações em tempo real do Strava"""
