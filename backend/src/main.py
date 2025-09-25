@@ -2788,8 +2788,10 @@ def get_challenges():
 
         print(f"🔗 [CHALLENGES] Mapeamento dinâmico: {category_string_to_id}")
 
-        # 3. BUSCAR TODOS OS DESAFIOS
-        all_challenges = session.query(Challenge).all()
+        # 3. BUSCAR DESAFIOS ATIVOS E PENDENTES (MUDANÇA PRINCIPAL)
+        all_challenges = session.query(Challenge).filter(
+            Challenge.status.in_(['active', 'pending'])
+        ).order_by(Challenge.created_at.desc()).all()
 
         if not all_challenges:
             print("⚠️ [CHALLENGES] Nenhum desafio encontrado no banco de dados.")
@@ -2828,12 +2830,23 @@ def get_challenges():
             # Adicionar campos de compatibilidade
             challenge_dict['participant_count'] = challenge_dict.get('current_participants', 0)
             
+            # NOVOS CAMPOS PARA DESAFIOS PENDENTES
+            status = challenge_dict.get('status', 'active')
+            challenge_dict.update({
+                'is_scheduled': status == 'pending',
+                'can_join': status == 'active', 
+                'status_label': 'Agendado' if status == 'pending' else 'Ativo',
+                'is_pending': status == 'pending',
+                'is_active': status == 'active'
+            })
+            
             challenges_data.append(challenge_dict)
 
         # Debug do mapeamento
         print("🏷️ [CHALLENGES DEBUG] Mapeamento dinâmico aplicado:")
         for challenge in challenges_data[:3]:
-            print(f"   - {challenge['title']}: {challenge['category']} → {challenge.get('category_name', 'N/A')}")
+            status_info = f"({challenge.get('status_label', 'N/A')})"
+            print(f"   - {challenge['title']}: {challenge['category']} → {challenge.get('category_name', 'N/A')} {status_info}")
 
         print(f"✅ [CHALLENGES] {len(challenges_data)} desafios processados com categorias dinâmicas.")
         return jsonify({
