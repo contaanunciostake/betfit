@@ -42,7 +42,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
 // CORREÇÃO: Definir API_BASE_URL corretamente
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://betfit-api.loca.lt';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://betfit-backend.onrender.com';
 
 console.log('🌐 MainLayout Config:', {
   hostname: window.location.hostname,
