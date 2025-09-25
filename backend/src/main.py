@@ -3836,106 +3836,185 @@ def create_challenge():
         session.close()
 
 
-# ✅ ENDPOINT AUXILIAR: Listar categorias disponíveis
+# ✅ ENDPOINT PRINCIPAL: Listar categorias para dropdown
 @app.route('/api/challenges/categories', methods=['GET'])
 def get_challenge_categories():
-    """Listar categorias de desafios disponíveis"""
+    """Listar categorias de desafios para dropdown"""
     session = SessionLocal()
     try:
+        print("📂 [GET_CATEGORIES] Buscando categorias ativas...")
+        
+        # Buscar categorias ativas
         categories = session.query(ChallengeCategory)\
             .filter(ChallengeCategory.is_active == True)\
             .order_by(ChallengeCategory.name)\
             .all()
         
+        print(f"📂 [GET_CATEGORIES] Encontradas {len(categories)} categorias")
+        
         categories_data = []
         for category in categories:
-            categories_data.append({
+            category_dict = {
                 'id': category.id,
                 'name': category.name,
                 'description': getattr(category, 'description', ''),
                 'icon': getattr(category, 'icon', '🏃'),
                 'is_active': category.is_active
-            })
+            }
+            categories_data.append(category_dict)
+            print(f"   - {category.name} (ID: {category.id})")
         
         return jsonify({
             "success": True,
             "message": f"{len(categories_data)} categorias encontradas",
-            "data": {
-                "categories": categories_data
-            }
+            "data": categories_data  # ✅ Array direto para facilitar o frontend
         }), 200
         
     except Exception as e:
         print(f"❌ [GET_CATEGORIES] Erro: {e}")
+        import traceback
+        print(f"❌ [GET_CATEGORIES] Stack trace: {traceback.format_exc()}")
         return jsonify({
             "success": False,
-            "error": "Erro interno do servidor"
+            "error": "Erro interno do servidor",
+            "data": []  # ✅ Array vazio em caso de erro
         }), 500
     finally:
         session.close()
 
 
-# ✅ ENDPOINT AUXILIAR: Validar configuração de múltiplos vencedores
-@app.route('/api/challenges/validate-winners-config', methods=['POST'])
-def validate_winners_config():
-    """Validar configuração de múltiplos vencedores antes de criar desafio"""
+# ✅ ENDPOINT ALTERNATIVO: Se a tabela não existe, criar categorias padrão
+@app.route('/api/dev/seed-categories', methods=['POST'])
+def seed_categories():
+    """Criar categorias padrão se não existirem"""
+    session = SessionLocal()
     try:
-        data = request.get_json()
+        print("🌱 [SEED_CATEGORIES] Criando categorias padrão...")
         
-        max_winners = int(data.get('max_winners', 1))
-        max_participants = int(data.get('max_participants', 100))
-        winner_selection_type = data.get('winner_selection_type', 'first_to_complete')
-        prize_distribution_type = data.get('prize_distribution_type', 'equal')
+        # Verificar se já existem categorias
+        existing_count = session.query(ChallengeCategory).count()
+        if existing_count > 0:
+            return jsonify({
+                "success": True,
+                "message": f"{existing_count} categorias já existem",
+                "data": []
+            }), 200
         
-        errors = []
-        warnings = []
+        # Criar categorias padrão
+        default_categories = [
+            {'name': 'Corrida', 'description': 'Desafios de corrida e running', 'icon': '🏃'},
+            {'name': 'Caminhada', 'description': 'Desafios de caminhada e steps', 'icon': '🚶'},
+            {'name': 'Ciclismo', 'description': 'Desafios de bike e cycling', 'icon': '🚴'},
+            {'name': 'Fitness', 'description': 'Treinos gerais de fitness', 'icon': '💪'},
+            {'name': 'Yoga', 'description': 'Práticas de yoga e mindfulness', 'icon': '🧘'},
+            {'name': 'Natação', 'description': 'Desafios aquáticos', 'icon': '🏊'}
+        ]
         
-        # Validações
-        if max_winners < 1:
-            errors.append("Número de vencedores deve ser pelo menos 1")
-        elif max_winners > 50:
-            errors.append("Número máximo de vencedores é 50")
+        created_categories = []
+        for cat_data in default_categories:
+            import uuid
+            category = ChallengeCategory(
+                id=str(uuid.uuid4()),
+                name=cat_data['name'],
+                description=cat_data['description'],
+                icon=cat_data['icon'],
+                is_active=True,
+                created_at=datetime.utcnow(),
+                updated_at=datetime.utcnow()
+            )
+            session.add(category)
+            created_categories.append({
+                'id': category.id,
+                'name': category.name,
+                'description': category.description,
+                'icon': category.icon
+            })
         
-        if max_participants < max_winners:
-            errors.append("Número de vencedores não pode exceder máximo de participantes")
+        session.commit()
         
-        if winner_selection_type not in ['first_to_complete', 'top_performers', 'all_qualifiers']:
-            errors.append("Tipo de seleção de vencedores inválido")
-        
-        if prize_distribution_type not in ['equal', 'proportional', 'ranking_based']:
-            errors.append("Tipo de distribuição de prêmios inválido")
-        
-        # Avisos
-        if max_winners > max_participants * 0.5:
-            warnings.append("Mais de 50% dos participantes serão vencedores")
-        
-        if max_winners > 10:
-            warnings.append("Muitos vencedores podem diluir significativamente o prêmio")
-        
-        is_valid = len(errors) == 0
+        print(f"✅ [SEED_CATEGORIES] {len(created_categories)} categorias criadas")
         
         return jsonify({
             "success": True,
-            "data": {
-                "is_valid": is_valid,
-                "errors": errors,
-                "warnings": warnings,
-                "configuration": {
-                    "max_winners": max_winners,
-                    "max_participants": max_participants,
-                    "winner_selection_type": winner_selection_type,
-                    "prize_distribution_type": prize_distribution_type,
-                    "multiple_winners_enabled": max_winners > 1
-                }
-            }
-        }), 200
+            "message": f"{len(created_categories)} categorias criadas com sucesso",
+            "data": created_categories
+        }), 201
         
     except Exception as e:
+        session.rollback()
+        print(f"❌ [SEED_CATEGORIES] Erro: {e}")
         return jsonify({
             "success": False,
-            "error": "Erro na validação",
-            "details": str(e)
-        }), 400
+            "error": f"Erro ao criar categorias: {str(e)}"
+        }), 500
+    finally:
+        session.close()
+
+
+# ✅ ENDPOINT DEBUG: Verificar se tabela de categorias existe
+@app.route('/api/dev/check-categories-table', methods=['GET'])
+def check_categories_table():
+    """Verificar se a tabela de categorias existe e tem dados"""
+    session = SessionLocal()
+    try:
+        print("🔍 [CHECK_CATEGORIES] Verificando tabela...")
+        
+        # Tentar fazer uma query simples
+        try:
+            categories = session.query(ChallengeCategory).all()
+            categories_data = []
+            for cat in categories:
+                categories_data.append({
+                    'id': cat.id,
+                    'name': cat.name,
+                    'is_active': cat.is_active
+                })
+            
+            return jsonify({
+                "success": True,
+                "message": "Tabela de categorias existe",
+                "data": {
+                    "table_exists": True,
+                    "total_categories": len(categories),
+                    "active_categories": len([c for c in categories if c.is_active]),
+                    "categories": categories_data
+                }
+            }), 200
+            
+        except Exception as table_error:
+            # Tabela não existe ou há erro de estrutura
+            print(f"⚠️ [CHECK_CATEGORIES] Erro na tabela: {table_error}")
+            return jsonify({
+                "success": False,
+                "message": "Tabela de categorias não existe ou tem problemas",
+                "data": {
+                    "table_exists": False,
+                    "error": str(table_error),
+                    "suggestion": "Execute /api/dev/seed-categories para criar as categorias"
+                }
+            }), 404
+        
+    except Exception as e:
+        print(f"❌ [CHECK_CATEGORIES] Erro geral: {e}")
+        return jsonify({
+            "success": False,
+            "error": f"Erro na verificação: {str(e)}"
+        }), 500
+    finally:
+        session.close()
+        
+# ✅ FUNÇÃO PARA TESTAR CONEXÃO COM BANCO
+def test_database_connection():
+    """Testa se consegue conectar com o banco de dados"""
+    try:
+        session = SessionLocal()
+        session.execute(text('SELECT 1'))
+        session.close()
+        print("✅ Conexão com banco OK")
+        return True
+    except Exception as e:
+        print(f"❌ Erro de conexão com banco: {e}")
+        return False
 
 # ADICIONE TAMBÉM O HANDLER OPTIONS PARA CORS
 @app.route('/api/challenges', methods=['OPTIONS'])
