@@ -2889,7 +2889,7 @@ def create_challenge():
         category_id = int(data['category_id'])
         category_query = session.execute(text('''
             SELECT id, name FROM challenge_categories 
-            WHERE id = :category_id AND is_active = 1
+            WHERE id = %(category_id)s AND (is_active = 'true' OR is_active = '1')
         '''), {"category_id": category_id})
         
         category_result = category_query.fetchone()
