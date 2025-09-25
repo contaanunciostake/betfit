@@ -20,7 +20,7 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS, cross_origin
 from sqlalchemy import or_, func, text
 from werkzeug.utils import secure_filename
-
+from models import ChallengeCategory
 
 from models import (
     User, Wallet, Transaction, Challenge,
@@ -2874,18 +2874,15 @@ def create_challenge():
             return jsonify({"error": f"Tipo de distribuição inválido. Use: {', '.join(valid_distribution_types)}"}), 400
         
         # 1. BUSCAR CATEGORIA REAL DA TABELA challenge_categories
-        category_id = int(data['category_id'])
-        category_query = session.execute(text('''
-            SELECT id, name FROM challenge_categories 
-            WHERE id = :category_id AND is_active = '1'
-        '''), {"category_id": category_id})
-        
-        category_result = category_query.fetchone()
-        if not category_result:
-            return jsonify({"error": f"Categoria ID {category_id} não encontrada ou inativa"}), 400
-        
-        category_name = category_result[1]
-        print(f"🏷️ [CREATE_CHALLENGE] Categoria encontrada: ID {category_id} = '{category_name}'")
+        category = session.query(ChallengeCategory).filter(
+        ChallengeCategory.id == category_id,
+        ChallengeCategory.is_active == True
+    ).first()
+    
+    if not category:
+        return jsonify({"error": f"Categoria ID {category_id} não encontrada ou inativa"}), 400
+    
+    category_name = category.name
         
         # 2. MAPEAR NOME DA CATEGORIA PARA STRING INTERNA
         category_string_map = {
