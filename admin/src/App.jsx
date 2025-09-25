@@ -16,25 +16,7 @@ import CategoriesPage from './pages/CategoriesPage'
 import SettingsPage from './pages/SettingsPage'
 import LogsPage from './pages/LogsPage'
 import InstallationPage from './pages/InstallationPage'
-// App.jsx ou main.jsx
 import { Toaster } from 'sonner';
-
-function App() {
-  return (
-    <div>
-      {/* Seu app */}
-      
-      {/* Adicione o Toaster no final */}
-      <Toaster 
-        position="top-right"
-        expand={true}
-        richColors={true}
-        closeButton={true}
-        theme="dark" // ou "light" dependendo do seu tema
-      />
-    </div>
-  );
-}
 
 // Context
 import { AdminProvider, useAdmin } from './contexts/AdminContext'
@@ -79,6 +61,15 @@ function AppContent() {
           </Routes>
         </main>
       </div>
+      
+      {/* Toaster adicionado dentro do AppContent */}
+      <Toaster 
+        position="top-right"
+        expand={true}
+        richColors={true}
+        closeButton={true}
+        theme="dark"
+      />
     </div>
   )
 }
