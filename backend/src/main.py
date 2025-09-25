@@ -2896,7 +2896,7 @@ def create_challenge():
             temp_cursor.execute("""
                 SELECT id, name FROM challenge_categories 
                 WHERE id = %s AND (is_active = 'true' OR is_active = '1')
-            """, (category_id,))
+            """, (str(category_id),))
             
             category_result = temp_cursor.fetchone()
             temp_conn.close()
