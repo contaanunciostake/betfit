@@ -779,6 +779,10 @@ const syncStravaActivities = async (userEmail, backendUrl) => {
 };
   
 // Parar sincronização do Strava
+// Verifique se as funções anteriores estão fechadas corretamente.
+// Aqui está o final correto do arquivo ProfileDevices:
+
+// Parar sincronização do Strava
 const stopStravaSync = (userEmail) => {
   const intervalId = localStorage.getItem(`strava_sync_${userEmail}`);
   if (intervalId) {
@@ -786,7 +790,7 @@ const stopStravaSync = (userEmail) => {
     localStorage.removeItem(`strava_sync_${userEmail}`);
     console.log('⏹️ [STRAVA_SYNC] Sincronização parada para:', userEmail);
   }
-};
+}; // <- Certifique-se que esta chave está fechada
 
 // Cleanup no useEffect
 useEffect(() => {
@@ -796,62 +800,62 @@ useEffect(() => {
       stopStravaSync(user.email);
     }
   };
-}, [user?.email]
+}, [user?.email]); // <- Certifique-se que esta chave está fechada
 
-  // Desconectar dispositivo
-  const handleDisconnectDevice = async (device) => {
-    try {
-      const confirmed = window.confirm(
-        `Tem certeza que deseja desconectar ${device.name}?`
-      );
+// Desconectar dispositivo
+const handleDisconnectDevice = async (device) => {
+  try {
+    const confirmed = window.confirm(
+      `Tem certeza que deseja desconectar ${device.name}?`
+    );
 
-      if (!confirmed) return;
+    if (!confirmed) return;
 
-      setConnecting(device.id);
+    setConnecting(device.id);
 
-      if (device.type === 'teste') {
-        stopMockActivitySimulation(user.email);
-      }
-
-      // Desconectar no backend
-      try {
-        const token = localStorage.getItem('token');
-        await fetch('http://localhost:5001/api/fitness/disconnect', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            user_email: user.email,
-            platform: device.type
-          })
-        });
-      } catch (error) {
-        console.warn('Erro ao desconectar no backend:', error);
-      }
-
-      // Remover localmente
-      const updatedConnections = fitnessConnections.filter(conn => conn.platform !== device.type);
-      setFitnessConnections(updatedConnections);
-      saveToLocalStorage(updatedConnections);
-      setLastSync(new Date());
-      
-      setSuccess(`${device.name} desconectado com sucesso.`);
-      
-      setTimeout(() => loadFitnessConnections(true), 500);
-      
-      if (onDisconnectDevice) {
-        onDisconnectDevice(device.id);
-      }
-
-    } catch (error) {
-      console.error('Erro ao desconectar:', error);
-      setError(error.message || `Erro ao desconectar ${device.name}`);
-    } finally {
-      setConnecting(null);
+    if (device.type === 'teste') {
+      stopMockActivitySimulation(user.email);
     }
-  };
+
+    // Desconectar no backend
+    try {
+      const token = localStorage.getItem('token');
+      await fetch('http://localhost:5001/api/fitness/disconnect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          user_email: user.email,
+          platform: device.type
+        })
+      });
+    } catch (error) {
+      console.warn('Erro ao desconectar no backend:', error);
+    }
+
+    // Remover localmente
+    const updatedConnections = fitnessConnections.filter(conn => conn.platform !== device.type);
+    setFitnessConnections(updatedConnections);
+    saveToLocalStorage(updatedConnections);
+    setLastSync(new Date());
+    
+    setSuccess(`${device.name} desconectado com sucesso.`);
+    
+    setTimeout(() => loadFitnessConnections(true), 500);
+    
+    if (onDisconnectDevice) {
+      onDisconnectDevice(device.id);
+    }
+
+  } catch (error) {
+    console.error('Erro ao desconectar:', error);
+    setError(error.message || `Erro ao desconectar ${device.name}`);
+  } finally {
+    setConnecting(null);
+  }
+};
 
   // Encontrar dispositivo por conexão
   const findDeviceByConnection = (connection) => {
