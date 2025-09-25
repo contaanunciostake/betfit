@@ -66,13 +66,20 @@ MERCADOPAGO_PUBLIC_KEY = None
 cors_origins = os.getenv('CORS_ORIGINS', '').split(',')
 if not cors_origins or cors_origins == ['']:
     cors_origins = [
+        # URLs de produção Render
+        "https://betfit-backend.onrender.com",
+        "https://betfit-frontend-thwz.onrender.com",
+        
+        # URLs de desenvolvimento localhost
         "http://localhost:5173", 
         "http://localhost:8080", 
         "http://localhost:3000", 
         "http://localhost:5001",
-        # URLs do Cloudflare Tunnel
+        
+        # URLs do Cloudflare Tunnel (desenvolvimento)
         "https://developing-seriously-dennis-automated.trycloudflare.com",
         "https://finances-gathering-eyes-del.trycloudflare.com",
+        
         # URLs antigas (mantidas como fallback)
         "https://betfit-front.loca.lt",
         "https://betfit-api.loca.lt",
@@ -102,7 +109,7 @@ CORS(app,
 def serve_upload(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
-settings_manager = SystemSettings(DATABASE_PATH)
+settings_manager = SystemSettings(DATABASE_URL)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # ================== NOVA ROTA PARA SERVIR ARQUIVOS DE UPLOAD ==================
@@ -122,15 +129,24 @@ def serve_logo(filename):
 
 @app.route('/api/settings', methods=['GET'])
 @cross_origin(origins=[
+    # URLs de produção Render
+    "https://betfit-backend.onrender.com",
+    "https://betfit-frontend-thwz.onrender.com",
+    
+    # URLs de desenvolvimento localhost
     "http://localhost:3000", 
     "http://localhost:5173", 
     "http://localhost:8080", 
-    # Adicionar URLs do Cloudflare aqui também
+    
+    # URLs do Cloudflare Tunnel
     "https://developing-seriously-dennis-automated.trycloudflare.com",
     "https://finances-gathering-eyes-del.trycloudflare.com",
+    
+    # URLs antigas (fallback)
     "https://betfit-front.loca.lt", 
     "https://betfit-api.loca.lt"
 ])
+
 def get_public_settings():
     """
     Endpoint otimizado para o frontend.
