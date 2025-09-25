@@ -396,6 +396,7 @@ const ChallengeForm = ({ formData, onInputChange, categories, creating, error })
 }
 
 export default function ChallengesPage() {
+  const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'https://betfit-backend.onrender.com'
   const [challenges, setChallenges] = useState([])
   const [categories, setCategories] = useState([])
   const [participationsData, setParticipationsData] = useState({})
@@ -461,10 +462,6 @@ export default function ChallengesPage() {
   const loadRealChallenges = async () => {
     try {
       console.log('🎮 [CHALLENGES] Buscando desafios do banco SQLite...')
-
-      // Então no início do arquivo, adicione:
-      const API_BASE_URL = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'https://betfit-backend.onrender.com'
-
       
       // Tentar endpoint admin primeiro
       let response = await fetch(`${API_BASE_URL}/api/admin/challenges/simple-real?_t=${Date.now()}`)
