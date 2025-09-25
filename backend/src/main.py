@@ -461,7 +461,7 @@ def initialize_mercadopago():
     
     try:
         # Carregar credenciais do banco de dados
-        conn = sqlite3.connect(DATABASE_PATH)
+        session = SessionLocal()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -505,7 +505,7 @@ def get_payments_config():
         print("🔍 [CONFIG] Buscando public_key do MercadoPago...")
         
         # Buscar as credenciais do banco de dados usando sqlite3 direto
-        conn = sqlite3.connect(DATABASE_PATH)
+        session = SessionLocal()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -4172,7 +4172,7 @@ def add_user_balance(user_id):
 
 def get_db_connection():
     """Conecta ao banco de dados"""
-    conn = sqlite3.connect(DATABASE_PATH)
+    session = SessionLocal()
     conn.row_factory = sqlite3.Row  # Para acessar colunas por nome
     return conn
 
@@ -5192,7 +5192,7 @@ def debug_database_structure():
     Endpoint para debugar a estrutura do banco de dados
     """
     try:
-        conn = sqlite3.connect(DATABASE_PATH)
+        session = SessionLocal()
         cursor = conn.cursor()
         
         # Verificar estrutura da tabela challenges
@@ -5272,7 +5272,7 @@ def force_refresh_challenges():
 def get_payment_settings():
     """Obter configurações de pagamento do banco SQLite - VERSÃO CORRIGIDA"""
     try:
-        conn = sqlite3.connect(DATABASE_PATH)
+        session = SessionLocal()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -5514,7 +5514,7 @@ def get_payment_settings():
 def get_transactions():
     """Obter transações de pagamento do banco SQLite"""
     try:
-        conn = sqlite3.connect(DATABASE_PATH)
+        session = SessionLocal()
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
@@ -5596,7 +5596,7 @@ def get_transactions():
 def toggle_payment_method(method):
     """Alternar status de método de pagamento no banco SQLite"""
     try:
-        conn = sqlite3.connect(DATABASE_PATH)
+        session = SessionLocal()
         cursor = conn.cursor()
         
         print(f"🔄 [PAYMENTS] Alternando status do método: {method}")
@@ -5647,7 +5647,7 @@ def update_payment_settings(method):
     try:
         data = request.get_json()
         
-        conn = sqlite3.connect(DATABASE_PATH)
+        session = SessionLocal()
         cursor = conn.cursor()
         
         print(f"💾 [PAYMENTS] Salvando configurações do {method}:", data)
