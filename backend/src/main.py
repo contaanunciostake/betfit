@@ -2250,35 +2250,279 @@ def verify_token():
 
 @app.route('/api/wallet/<email>', methods=['GET'])
 def get_wallet_by_email(email):
-    """Busca dados da carteira por email - DADOS REAIS DO BANCO"""
+    """
+    Busca dados da carteira por email - DADOS REAIS DO BANCO
+    
+    ⚠️ NOTA: Em produção, considere usar autenticação por token em vez de email na URL
+    """
     session = SessionLocal()
     try:
+        # Validar formato do email
+        import re
+        email = email.strip().lower()
+        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        
+        if not re.match(email_pattern, email):
+            return jsonify({
+                "success": False,
+                "error": "Formato de email inválido"
+            }), 400
+        
         print(f"💰 [WALLET] Buscando carteira para: {email}")
         
-        # Buscar usuário por email
-        user = session.query(User).filter_by(email=email).first()
+        # ✅ Query otimizada: buscar usuário e carteira em uma única consulta
+        from sqlalchemy.orm import joinedload
+        user = session.query(User)\
+            .options(joinedload(User.wallet))\
+            .filter_by(email=email)\
+            .first()
+        
         if not user:
             print(f"❌ [WALLET] Usuário não encontrado: {email}")
-            return jsonify({"error": "Usuário não encontrado"}), 404
+            return jsonify({
+                "success": False,
+                "error": "Usuário não encontrado"
+            }), 404
         
-        # Buscar carteira do usuário
-        wallet = session.query(Wallet).filter_by(user_id=user.id).first()
+        # Verificar se o usuário está ativo
+        if user.status != 'active':
+            return jsonify({
+                "success": False,
+                "error": "Conta inativa"
+            }), 403
+        
+        # Buscar ou criar carteira
+        wallet = user.wallet if hasattr(user, 'wallet') and user.wallet else None
+        if not wallet:
+            wallet = session.query(Wallet).filter_by(user_id=user.id).first()
+        
+        from datetime import datetime
         if not wallet:
             print(f"⚠️ [WALLET] Carteira não encontrada, criando...")
-            # Criar carteira se não existir
+            current_time = datetime.utcnow()
             wallet = Wallet(
                 id=str(uuid.uuid4()),
                 user_id=user.id,
                 balance=0.0,
                 available=0.0,
                 pending=0.0,
-                currency='BRL'
+                currency='BRL',
+                created_at=current_time,
+                updated_at=current_time
             )
             session.add(wallet)
             session.commit()
         
-        # Buscar transações
-        transactions = session.query(Transaction).filter_by(user_id=user.id).order_by(Transaction.created_at.desc()).limit(10).all()
+        # ✅ Buscar transações com paginação e ordenação otimizada
+        transactions = session.query(Transaction)\
+            .filter_by(user_id=user.id)\
+            .order_by(Transaction.created_at.desc())\
+            .limit(10)\
+            .all()
+        
+        # ✅ Calcular estatísticas reais da carteira
+        from sqlalchemy import func
+        
+        # Total de depósitos (transações positivas de diferentes tipos)
+        deposits_result = session.query(func.sum(Transaction.amount))\
+            .filter(Transaction.user_id == user.id)\
+            .filter(Transaction.amount > 0)\
+            .filter(Transaction.type.in_(['deposit', 'bonus', 'win']))\
+            .filter(Transaction.status == 'completed')\
+            .scalar()
+        total_deposits = float(deposits_result or 0.0)
+        
+        # Total de saques (transações negativas)
+        withdrawals_result = session.query(func.sum(Transaction.amount))\
+            .filter(Transaction.user_id == user.id)\
+            .filter(Transaction.amount < 0)\
+            .filter(Transaction.type.in_(['withdrawal', 'bet']))\
+            .filter(Transaction.status == 'completed')\
+            .scalar()
+        total_withdrawals = abs(float(withdrawals_result or 0.0))
+        
+        # Total de ganhos
+        winnings_result = session.query(func.sum(Transaction.amount))\
+            .filter(Transaction.user_id == user.id)\
+            .filter(Transaction.type == 'win')\
+            .filter(Transaction.status == 'completed')\
+            .scalar()
+        total_winnings = float(winnings_result or 0.0)
+        
+        # Total de apostas
+        bets_result = session.query(func.sum(Transaction.amount))\
+            .filter(Transaction.user_id == user.id)\
+            .filter(Transaction.type == 'bet')\
+            .filter(Transaction.status == 'completed')\
+            .scalar()
+        total_losses = abs(float(bets_result or 0.0))
+        
+        # ✅ Formatar transações com segurança
+        transactions_list = []
+        for tx in transactions:
+            transactions_list.append({
+                'id': tx.id,
+                'type': tx.type,
+                'amount': float(tx.amount),
+                'description': tx.description,
+                'status': tx.status,
+                'created_at': tx.created_at.isoformat() if tx.created_at else None
+            })
+        
+        # ✅ Calcular saldo bloqueado (pending) corretamente
+        locked_balance = float(wallet.pending or 0.0)
+        available_balance = float(wallet.available or 0.0)
+        total_balance = float(wallet.balance or 0.0)
+        
+        # ✅ Dados estruturados da carteira
+        wallet_data = {
+            "user_info": {
+                "email": email,
+                "name": user.name,
+                "status": user.status,
+                "kyc_status": user.kyc_status
+            },
+            "balance": {
+                "total": total_balance,
+                "available": available_balance,
+                "locked": locked_balance,
+                "currency": wallet.currency or 'BRL'
+            },
+            "statistics": {
+                "total_deposits": total_deposits,
+                "total_withdrawals": total_withdrawals,
+                "total_winnings": total_winnings,
+                "total_losses": total_losses,
+                "net_profit": total_winnings - total_losses,
+                "total_bets": user.total_bets or 0
+            },
+            "recent_transactions": transactions_list,
+            "metadata": {
+                "wallet_created_at": wallet.created_at.isoformat() if wallet.created_at else None,
+                "last_updated": wallet.updated_at.isoformat() if wallet.updated_at else datetime.utcnow().isoformat(),
+                "transactions_shown": len(transactions_list),
+                "total_transactions": session.query(Transaction).filter_by(user_id=user.id).count()
+            }
+        }
+        
+        print(f"✅ [WALLET] Carteira encontrada: R$ {total_balance:.2f} (Disponível: R$ {available_balance:.2f})")
+        
+        return jsonify({
+            "success": True,
+            "message": "Dados da carteira obtidos com sucesso",
+            "data": wallet_data
+        }), 200
+        
+    except ValueError as ve:
+        print(f"❌ [WALLET] Erro de validação: {ve}")
+        return jsonify({
+            "success": False,
+            "error": "Dados inválidos fornecidos"
+        }), 400
+        
+    except Exception as e:
+        session.rollback()
+        print(f"❌ [WALLET] Erro ao buscar carteira: {e}")
+        import traceback
+        print(f"❌ [WALLET] Stack trace: {traceback.format_exc()}")
+        return jsonify({
+            "success": False,
+            "error": "Erro interno do servidor"
+        }), 500
+    finally:
+        session.close()
+
+
+# ✅ ENDPOINT COMPLEMENTAR: Buscar carteira por ID do usuário (mais seguro)
+@app.route('/api/wallet/user/<user_id>', methods=['GET'])
+def get_wallet_by_user_id(user_id):
+    """
+    Busca dados da carteira por ID do usuário (mais seguro que por email)
+    Requer autenticação por token em produção
+    """
+    session = SessionLocal()
+    try:
+        # Validar UUID
+        import uuid as uuid_lib
+        try:
+            uuid_lib.UUID(user_id)
+        except ValueError:
+            return jsonify({
+                "success": False,
+                "error": "ID de usuário inválido"
+            }), 400
+        
+        # Buscar usuário e carteira
+        user = session.query(User).filter_by(id=user_id).first()
+        if not user:
+            return jsonify({
+                "success": False,
+                "error": "Usuário não encontrado"
+            }), 404
+        
+        wallet = session.query(Wallet).filter_by(user_id=user_id).first()
+        if not wallet:
+            return jsonify({
+                "success": False,
+                "error": "Carteira não encontrada"
+            }), 404
+        
+        # Resposta simplificada
+        wallet_data = {
+            "balance": float(wallet.balance or 0.0),
+            "available": float(wallet.available or 0.0),
+            "pending": float(wallet.pending or 0.0),
+            "currency": wallet.currency or 'BRL'
+        }
+        
+        return jsonify({
+            "success": True,
+            "data": wallet_data
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ [WALLET_BY_ID] Erro: {e}")
+        return jsonify({
+            "success": False,
+            "error": "Erro interno do servidor"
+        }), 500
+    finally:
+        session.close()
+
+
+# ✅ ENDPOINT: Histórico completo de transações com paginação
+@app.route('/api/wallet/<email>/transactions', methods=['GET'])
+def get_wallet_transactions(email):
+    """Busca histórico completo de transações com paginação"""
+    session = SessionLocal()
+    try:
+        from flask import request
+        
+        # Parâmetros de paginação
+        page = int(request.args.get('page', 1))
+        per_page = min(int(request.args.get('per_page', 20)), 100)  # Max 100 por página
+        transaction_type = request.args.get('type')  # Filtro por tipo
+        
+        # Buscar usuário
+        user = session.query(User).filter_by(email=email.strip().lower()).first()
+        if not user:
+            return jsonify({
+                "success": False,
+                "error": "Usuário não encontrado"
+            }), 404
+        
+        # Query base
+        query = session.query(Transaction).filter_by(user_id=user.id)
+        
+        # Filtro por tipo se fornecido
+        if transaction_type:
+            query = query.filter(Transaction.type == transaction_type)
+        
+        # Ordenação e paginação
+        query = query.order_by(Transaction.created_at.desc())
+        total_transactions = query.count()
+        
+        transactions = query.offset((page - 1) * per_page).limit(per_page).all()
         
         transactions_list = []
         for tx in transactions:
@@ -2291,28 +2535,27 @@ def get_wallet_by_email(email):
                 'created_at': tx.created_at.isoformat() if tx.created_at else None
             })
         
-        wallet_data = {
-            "user_email": email,
-            "balance": float(wallet.balance or 0.0),
-            "available_balance": float(wallet.available or 0.0),
-            "locked_balance": float(wallet.pending or 0.0),
-            "total_deposits": float(wallet.balance or 0.0),  # Simplificado
-            "total_withdrawals": 0.0,  # Implementar depois
-            "total_winnings": 0.0,  # Implementar depois
-            "total_losses": 0.0,  # Implementar depois
-            "transactions": transactions_list,
-            "last_updated": wallet.updated_at.isoformat() if wallet.updated_at else datetime.utcnow().isoformat()
-        }
-        
-        print(f"✅ [WALLET] Carteira encontrada: R$ {wallet_data['balance']:.2f}")
-        return jsonify(wallet_data)
+        return jsonify({
+            "success": True,
+            "data": {
+                "transactions": transactions_list,
+                "pagination": {
+                    "page": page,
+                    "per_page": per_page,
+                    "total": total_transactions,
+                    "pages": (total_transactions + per_page - 1) // per_page
+                }
+            }
+        }), 200
         
     except Exception as e:
-        print(f"❌ [WALLET] Erro ao buscar carteira: {e}")
-        return jsonify({"error": f"Erro ao buscar carteira: {str(e)}"}), 500
+        print(f"❌ [WALLET_TRANSACTIONS] Erro: {e}")
+        return jsonify({
+            "success": False,
+            "error": "Erro interno do servidor"
+        }), 500
     finally:
         session.close()
-
 @app.route('/api/wallet', methods=['GET'])
 def get_wallet_by_query():
     """Busca dados da carteira por query parameter"""
@@ -3045,66 +3288,216 @@ def meets_challenge_criteria(fitness_data, challenge):
 def complete_challenge_automatically(session, challenge, participation, fitness_data):
     """Completa o desafio automaticamente quando meta é atingida"""
     try:
+        import datetime
+        import json
+        import uuid
+        
         completion_time = datetime.datetime.utcnow()
         achieved_value = float(fitness_data.get('value', 0))
+        
+        print(f"🎯 [AUTO_COMPLETE] Iniciando conclusão automática do desafio '{challenge.title}'")
+        print(f"   - Valor atingido: {achieved_value} {challenge.target_unit}")
+        print(f"   - Meta: {challenge.target_value} {challenge.target_unit}")
+        
+        # Verificar se realmente atingiu a meta
+        if achieved_value < float(challenge.target_value):
+            raise ValueError(f"Valor atingido ({achieved_value}) menor que a meta ({challenge.target_value})")
         
         # Atualizar participação
         participation.status = 'completed'
         participation.result_value = achieved_value
         participation.completed_at = completion_time
         participation.validation_status = 'validated'
+        participation.updated_at = completion_time
         
-        # Atualizar desafio
-        challenge.status = 'completed'
-        challenge.updated_at = completion_time
+        print(f"   ✅ Participação atualizada: status -> completed")
+        
+        # Atualizar desafio (se for individual ou último participante)
+        # Note: Para desafios com múltiplos participantes, você pode querer uma lógica diferente
+        if challenge.current_participants == 1:  # Desafio individual
+            challenge.status = 'completed'
+            challenge.updated_at = completion_time
+            print(f"   ✅ Desafio marcado como completo (individual)")
         
         # Criar validação automática
+        validation_id = str(uuid.uuid4())
         validation = ChallengeValidation(
+            id=validation_id,
             participation_id=participation.id,
             challenge_id=challenge.id,
             user_id=participation.user_id,
-            fitness_data_ids=json.dumps([fitness_data.get('id', 'auto')]),
+            fitness_data_ids=json.dumps([fitness_data.get('id', 'auto_' + validation_id)]),
             validation_type='automatic',
             validation_status='validated',
             target_value=float(challenge.target_value),
             achieved_value=achieved_value,
             confidence_score=0.95,
             validation_notes=f'Meta atingida automaticamente via HealthKit: {achieved_value} {challenge.target_unit}',
-            validated_at=completion_time
+            validated_at=completion_time,
+            created_at=completion_time,
+            updated_at=completion_time
         )
         session.add(validation)
+        print(f"   ✅ Validação automática criada")
+        
+        # Calcular prêmio (assumindo que é winner-takes-all ou proporcional)
+        total_pool = float(challenge.total_pool or 0.0)
+        platform_fee = 0.05  # 5% de taxa da plataforma
+        prize_amount = total_pool * (1 - platform_fee)
         
         # Criar resultado
+        result_id = str(uuid.uuid4())
         result = ChallengeResult(
+            id=result_id,
             challenge_id=challenge.id,
             participation_id=participation.id,
             user_id=participation.user_id,
             result_value=achieved_value,
-            result_unit=challenge.target_unit,
+            result_unit=challenge.target_unit or 'points',
             validation_status='validated',
-            ranking_position=1,  # Primeiro a completar
-            prize_amount=float(challenge.total_pool * 0.95)  # 95% do pool (5% taxa)
+            ranking_position=1,  # Primeiro a completar (ou ajustar lógica conforme necessário)
+            prize_amount=prize_amount,
+            prize_currency='BRL',
+            awarded_at=completion_time,
+            created_at=completion_time,
+            updated_at=completion_time
         )
         session.add(result)
+        print(f"   ✅ Resultado criado: prêmio R$ {prize_amount:.2f}")
         
+        # Atualizar saldo da carteira do usuário (adicionar prêmio)
+        wallet = session.query(Wallet).filter_by(user_id=participation.user_id).first()
+        if wallet:
+            old_balance = wallet.balance
+            wallet.balance = float(wallet.balance) + prize_amount
+            wallet.available = float(wallet.available) + prize_amount
+            wallet.updated_at = completion_time
+            
+            # Criar transação de prêmio
+            prize_transaction = Transaction(
+                id=str(uuid.uuid4()),
+                user_id=participation.user_id,
+                type='win',
+                amount=prize_amount,
+                description=f'Prêmio do desafio: {challenge.title}',
+                status='completed',
+                reference_id=result.id,
+                created_at=completion_time
+            )
+            session.add(prize_transaction)
+            
+            print(f"   ✅ Carteira atualizada: R$ {old_balance:.2f} → R$ {wallet.balance:.2f}")
+        else:
+            print(f"   ⚠️ Carteira não encontrada para o usuário {participation.user_id}")
+        
+        # Commit de todas as alterações
         session.commit()
         
-        print(f"🏆 Desafio '{challenge.title}' completado automaticamente por {participation.user_email}")
+        print(f"🏆 [AUTO_COMPLETE] Desafio '{challenge.title}' completado automaticamente!")
+        print(f"   - Usuário: {getattr(participation, 'user_email', participation.user_id)}")
+        print(f"   - Prêmio: R$ {prize_amount:.2f}")
         
         return {
+            "success": True,
             "challenge_id": challenge.id,
             "challenge_title": challenge.title,
-            "user_email": participation.user_email,
+            "user_id": participation.user_id,
+            "user_email": getattr(participation, 'user_email', 'N/A'),
             "achieved_value": achieved_value,
             "target_value": float(challenge.target_value),
-            "prize_amount": float(result.prize_amount),
-            "completed_at": completion_time.isoformat()
+            "prize_amount": prize_amount,
+            "completed_at": completion_time.isoformat(),
+            "validation_id": validation_id,
+            "result_id": result_id
         }
+        
+    except ValueError as ve:
+        session.rollback()
+        print(f"❌ [AUTO_COMPLETE] Erro de validação: {ve}")
+        raise ve
         
     except Exception as e:
         session.rollback()
-        print(f"❌ Erro ao completar desafio: {e}")
+        print(f"❌ [AUTO_COMPLETE] Erro ao completar desafio: {e}")
+        import traceback
+        print(f"❌ [AUTO_COMPLETE] Stack trace: {traceback.format_exc()}")
         raise e
+
+
+# ✅ FUNÇÃO AUXILIAR: Verificar se desafio pode ser completado automaticamente
+def can_auto_complete_challenge(challenge, fitness_data):
+    """
+    Verifica se o desafio pode ser completado automaticamente
+    com base nos dados de fitness recebidos
+    """
+    try:
+        if not challenge or not fitness_data:
+            return False, "Dados insuficientes"
+        
+        if challenge.status != 'active':
+            return False, f"Desafio não está ativo (status: {challenge.status})"
+        
+        achieved_value = float(fitness_data.get('value', 0))
+        target_value = float(challenge.target_value)
+        
+        if achieved_value < target_value:
+            return False, f"Meta não atingida: {achieved_value} < {target_value}"
+        
+        # Verificar se o tipo de dado bate com o desafio
+        fitness_type = fitness_data.get('type', '').lower()
+        challenge_category = challenge.category.lower()
+        
+        # Mapeamento de tipos compatíveis
+        compatible_types = {
+            'running': ['steps', 'distance', 'workout'],
+            'walking': ['steps', 'distance'],
+            'gym': ['workout', 'calories'],
+            'cycling': ['distance', 'workout'],
+            'swimming': ['distance', 'workout'],
+            'yoga': ['workout', 'mindfulness']
+        }
+        
+        if challenge_category in compatible_types:
+            if fitness_type not in compatible_types[challenge_category]:
+                return False, f"Tipo de fitness incompatível: {fitness_type} não combina com {challenge_category}"
+        
+        return True, "Desafio pode ser completado automaticamente"
+        
+    except Exception as e:
+        return False, f"Erro na verificação: {str(e)}"
+
+
+# ✅ FUNÇÃO AUXILIAR: Listar desafios elegíveis para conclusão automática
+def get_auto_completable_challenges(session, user_id):
+    """
+    Retorna lista de desafios do usuário que podem ser completados automaticamente
+    """
+    try:
+        # Buscar participações ativas do usuário
+        active_participations = session.query(ChallengeParticipation)\
+            .join(Challenge)\
+            .filter(ChallengeParticipation.user_id == user_id)\
+            .filter(ChallengeParticipation.status == 'active')\
+            .filter(Challenge.status == 'active')\
+            .all()
+        
+        completable_challenges = []
+        for participation in active_participations:
+            challenge = participation.challenge
+            completable_challenges.append({
+                'challenge_id': challenge.id,
+                'challenge_title': challenge.title,
+                'participation_id': participation.id,
+                'target_value': float(challenge.target_value),
+                'target_unit': challenge.target_unit,
+                'category': challenge.category
+            })
+        
+        return completable_challenges
+        
+    except Exception as e:
+        print(f"❌ Erro ao buscar desafios completáveis: {e}")
+        return []
 
 @app.route('/api/fitness/data', methods=['POST'])
 def receive_fitness_data():
