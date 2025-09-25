@@ -1784,29 +1784,40 @@ def seed_database():
 
 @app.route('/api/auth/register', methods=['POST'])
 def register():
-    """Registro de usuário com persistência real no banco PostgreSQL"""
+    """Registro de usuário com validação completa"""
     session = SessionLocal()
     try:
+        # Verificar se recebeu dados
         data = request.get_json()
+        if not data:
+            print("❌ [REGISTER] Nenhum dado JSON recebido")
+            return jsonify({
+                'success': False,
+                'error': 'Dados não fornecidos'
+            }), 400
         
-        print(f"🔍 [REGISTRO] Iniciando processo de registro...")
-        print(f"🔍 [REGISTRO] Dados recebidos: {data}")
+        print(f"📝 [REGISTER] Dados recebidos: {list(data.keys())}")
         
-        # Validar dados obrigatórios
+        # Validar campos obrigatórios
         required_fields = ['name', 'email', 'password']
+        missing_fields = []
+        
         for field in required_fields:
             if not data.get(field) or not str(data.get(field)).strip():
-                return jsonify({
-                    'success': False,
-                    'error': f'Campo {field} é obrigatório e não pode estar vazio'
-                }), 400
+                missing_fields.append(field)
         
-        # Validações adicionais
+        if missing_fields:
+            return jsonify({
+                'success': False,
+                'error': f'Campos obrigatórios faltando: {", ".join(missing_fields)}'
+            }), 400
+        
+        # Normalizar dados
         email = data['email'].strip().lower()
         password = data['password'].strip()
         name = data['name'].strip()
         
-        # Validar formato do email
+        # Validar email
         import re
         email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         if not re.match(email_pattern, email):
@@ -1815,26 +1826,29 @@ def register():
                 'error': 'Formato de email inválido'
             }), 400
         
-        # Validar senha (mínimo 6 caracteres)
+        # Validar senha
         if len(password) < 6:
             return jsonify({
                 'success': False,
                 'error': 'Senha deve ter pelo menos 6 caracteres'
             }), 400
         
+        print(f"✅ [REGISTER] Validação OK para: {email}")
+        
         # Verificar se email já existe
-        print(f"🔍 [REGISTRO] Verificando se email {email} já existe...")
         existing_user = session.query(User).filter_by(email=email).first()
         if existing_user:
-            print(f"❌ [REGISTRO] Email já existe: {email}")
+            print(f"❌ [REGISTER] Email já existe: {email}")
             return jsonify({
                 'success': False,
                 'error': 'Email já cadastrado'
-            }), 409  # Conflict
-        print(f"✅ [REGISTRO] Email disponível: {email}")
+            }), 409
         
-        # Criar novo usuário com timestamps
+        # Criar usuário
         from datetime import datetime
+        import uuid
+        import secrets
+        
         user_id = str(uuid.uuid4())
         current_time = datetime.utcnow()
         
@@ -1848,13 +1862,11 @@ def register():
             kyc_status='pending',
             created_at=current_time,
             updated_at=current_time,
-            total_bets=0  # Inicializar contador
+            total_bets=0
         )
-        
         session.add(user)
-        print(f"🔍 [REGISTRO] Usuário adicionado à sessão: {user.email}")
         
-        # Criar carteira para o usuário com bônus de boas-vindas
+        # Criar carteira
         wallet = Wallet(
             id=str(uuid.uuid4()),
             user_id=user_id,
@@ -1866,88 +1878,61 @@ def register():
             updated_at=current_time
         )
         session.add(wallet)
-        print(f"🔍 [REGISTRO] Carteira adicionada à sessão para usuário: {user_id}")
         
-        # Adicionar transação de bônus de boas-vindas
+        # Criar transação de bônus
         bonus_transaction = Transaction(
             id=str(uuid.uuid4()),
             user_id=user_id,
             type='bonus',
             amount=50.0,
-            description='Bônus de boas-vindas - Bem-vindo ao BetFit!',
+            description='Bônus de boas-vindas',
             status='completed',
             created_at=current_time
         )
         session.add(bonus_transaction)
         
-        # ✅ COMMIT ÚNICO - todas as operações juntas (transação ACID)
+        # Commit tudo junto
         session.commit()
-        print(f"✅ [REGISTRO] Usuário, carteira e transação commitados no banco")
         
-        # Gerar token de acesso mais seguro
-        access_token = secrets.token_urlsafe(32)  # Mais seguro que hex
+        # Gerar token
+        access_token = secrets.token_urlsafe(32)
         
-        # Resposta estruturada sem dados sensíveis
-        user_response = {
-            "id": user.id,
-            "name": user.name,
-            "email": user.email,
-            "phone": user.phone,
-            "status": user.status,
-            "kyc_status": user.kyc_status,
-            "total_bets": user.total_bets,
-            "created_at": user.created_at.isoformat() if user.created_at else None
-        }
-        
-        wallet_response = {
-            "balance": float(wallet.balance),
-            "available": float(wallet.available),
-            "pending": float(wallet.pending),
-            "currency": wallet.currency
-        }
-        
-        print(f"✅ [REGISTRO] Novo usuário registrado: {user.email} (ID: {user_id})")
-        
-        return jsonify({
+        # Resposta padronizada
+        response_data = {
             'success': True,
-            'message': 'Usuário registrado com sucesso! Bônus de R$ 50,00 adicionado à carteira.',
+            'message': 'Usuário registrado com sucesso!',
             'data': {
-                'user': user_response,
-                'wallet': wallet_response,
-                'bonus_applied': True,
-                'bonus_amount': 50.0
+                'user': {
+                    'id': user.id,
+                    'name': user.name,
+                    'email': user.email,
+                    'phone': user.phone,
+                    'status': user.status,
+                    'kyc_status': user.kyc_status
+                },
+                'wallet': {
+                    'balance': float(wallet.balance),
+                    'available': float(wallet.available),
+                    'currency': wallet.currency
+                },
+                'bonus_applied': True
             },
             'access_token': access_token
-        }), 201
-    
-    except ValueError as ve:
-        session.rollback()
-        print(f"❌ [REGISTRO] Erro de validação: {ve}")
-        return jsonify({
-            'success': False,
-            'error': 'Dados fornecidos são inválidos',
-            'details': str(ve) if app.debug else None
-        }), 400
-    
+        }
+        
+        print(f"✅ [REGISTER] Usuário criado: {email}")
+        return jsonify(response_data), 201
+        
     except Exception as e:
         session.rollback()
-        print(f"❌ [REGISTRO] ERRO DETALHADO: {e}")
-        print(f"❌ [REGISTRO] Tipo do erro: {type(e)}")
+        print(f"❌ [REGISTER] Erro: {e}")
         import traceback
-        error_trace = traceback.format_exc()
-        print(f"❌ [REGISTRO] Stack trace: {error_trace}")
-        
-        # Verificar se é erro de duplicata (caso raro de condição de corrida)
-        if 'duplicate key' in str(e).lower() or 'unique constraint' in str(e).lower():
-            return jsonify({
-                'success': False,
-                'error': 'Email já cadastrado'
-            }), 409
+        print(f"❌ [REGISTER] Stack: {traceback.format_exc()}")
         
         return jsonify({
             'success': False,
             'error': 'Erro interno do servidor',
-            'details': error_trace if app.debug else None
+            'details': str(e) if app.debug else None
         }), 500
     finally:
         session.close()
@@ -1956,21 +1941,22 @@ def register():
 # ✅ ENDPOINT COMPLEMENTAR: Login para testar o registro
 
 @app.route('/api/auth/login', methods=['POST'])
-def login():
-    """Login de usuário com validação segura de senha"""
+def user_login():  # Nome diferente para evitar conflito
+    """Login de usuário com validação robusta"""
     session = SessionLocal()
     try:
+        # Verificar dados recebidos
         data = request.get_json()
-        
-        # Validação inicial
         if not data:
             return jsonify({
                 'success': False,
                 'error': 'Dados não fornecidos'
             }), 400
         
-        email = data.get('email', '').strip().lower() if data.get('email') else None
-        password = data.get('password', '').strip() if data.get('password') else None
+        email = data.get('email', '').strip().lower()
+        password = data.get('password', '').strip()
+        
+        print(f"🔐 [LOGIN] Tentativa para: {email}")
         
         if not email or not password:
             return jsonify({
@@ -1978,117 +1964,87 @@ def login():
                 'error': 'Email e senha são obrigatórios'
             }), 400
         
-        print(f"🔐 [LOGIN] Tentativa de login: {email}")
-        
-        # Buscar usuário no banco
+        # Buscar usuário
         user = session.query(User).filter_by(email=email).first()
         if not user:
             print(f"❌ [LOGIN] Usuário não encontrado: {email}")
-            # Por segurança, mesma mensagem para usuário inexistente e senha incorreta
             return jsonify({
                 'success': False,
                 'error': 'Credenciais inválidas'
             }), 401
         
-        # ✅ CORREÇÃO CRÍTICA: Validar senha corretamente
-        # NUNCA gerar novo hash - sempre verificar contra o hash armazenado
+        # Verificar senha
         if not verify_password(password, user.password):
-            print(f"❌ [LOGIN] Senha incorreta para: {email}")
+            print(f"❌ [LOGIN] Senha incorreta: {email}")
             return jsonify({
                 'success': False,
                 'error': 'Credenciais inválidas'
             }), 401
         
-        # Verificar status do usuário
+        # Verificar status
         if user.status != 'active':
-            print(f"❌ [LOGIN] Usuário inativo: {email} (Status: {user.status})")
             return jsonify({
                 'success': False,
-                'error': 'Conta inativa. Entre em contato com o suporte.'
+                'error': 'Conta inativa'
             }), 403
         
         # Atualizar último login
         from datetime import datetime
+        import secrets
+        
         user.last_login = datetime.utcnow()
         user.updated_at = datetime.utcnow()
         
-        # Gerar token de acesso mais seguro
-        access_token = secrets.token_urlsafe(32)
-        
-        # Obter carteira do usuário
+        # Buscar carteira
         wallet = session.query(Wallet).filter_by(user_id=user.id).first()
         
-        # Estruturar dados da carteira
-        wallet_data = {
-            "balance": float(wallet.balance) if wallet and wallet.balance is not None else 0.0,
-            "available": float(wallet.available) if wallet and wallet.available is not None else 0.0,
-            "pending": float(wallet.pending) if wallet and wallet.pending is not None else 0.0,
-            "currency": wallet.currency if wallet else 'BRL'
+        # Gerar token
+        access_token = secrets.token_urlsafe(32)
+        
+        # Preparar resposta
+        user_data = {
+            'id': user.id,
+            'name': user.name,
+            'email': user.email,
+            'phone': user.phone,
+            'status': user.status,
+            'kyc_status': user.kyc_status,
+            'total_bets': user.total_bets or 0
         }
         
-        # Se não tem carteira, criar uma básica (caso de dados inconsistentes)
-        if not wallet:
-            print(f"⚠️  [LOGIN] Usuário {email} sem carteira - criando carteira básica")
-            wallet = Wallet(
-                id=str(uuid.uuid4()),
-                user_id=user.id,
-                balance=0.0,
-                available=0.0,
-                pending=0.0,
-                currency='BRL',
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow()
-            )
-            session.add(wallet)
+        wallet_data = {
+            'balance': float(wallet.balance) if wallet else 0.0,
+            'available': float(wallet.available) if wallet else 0.0,
+            'pending': float(wallet.pending) if wallet else 0.0,
+            'currency': wallet.currency if wallet else 'BRL'
+        }
         
-        # Commit das atualizações
         session.commit()
         
-        # Resposta estruturada sem dados sensíveis
-        user_response = {
-            "id": user.id,
-            "name": user.name,
-            "email": user.email,
-            "phone": user.phone,
-            "status": user.status,
-            "kyc_status": user.kyc_status,
-            "total_bets": user.total_bets or 0,
-            "created_at": user.created_at.isoformat() if user.created_at else None,
-            "last_login": user.last_login.isoformat() if user.last_login else None
-        }
-        
-        print(f"✅ [LOGIN] Login realizado com sucesso: {email}")
+        print(f"✅ [LOGIN] Login bem-sucedido: {email}")
         
         return jsonify({
             'success': True,
             'message': 'Login realizado com sucesso',
             'data': {
-                'user': user_response,
+                'user': user_data,
                 'wallet': wallet_data
             },
             'access_token': access_token
         }), 200
         
-    except ValueError as ve:
-        session.rollback()
-        print(f"❌ [LOGIN] Erro de validação: {ve}")
-        return jsonify({
-            'success': False,
-            'error': 'Dados inválidos fornecidos'
-        }), 400
-        
     except Exception as e:
         session.rollback()
-        print(f"❌ [LOGIN] Erro no login: {e}")
+        print(f"❌ [LOGIN] Erro: {e}")
         import traceback
-        print(f"❌ [LOGIN] Stack trace: {traceback.format_exc()}")
+        print(f"❌ [LOGIN] Stack: {traceback.format_exc()}")
+        
         return jsonify({
             'success': False,
             'error': 'Erro interno do servidor'
         }), 500
     finally:
         session.close()
-
 
 # ✅ FUNÇÃO AUXILIAR: Verificação segura de senha
 def verify_password(plain_password, hashed_password):
@@ -2116,28 +2072,31 @@ def verify_password(plain_password, hashed_password):
 
 # ✅ FUNÇÃO AUXILIAR: Hash seguro de senha
 def hash_password(password):
-    """
-    Gera hash seguro da senha.
-    
-    Args:
-        password (str): Senha em texto plano
-    
-    Returns:
-        str: Hash da senha
-    """
+    """Hash seguro da senha"""
     try:
-        # Se estiver usando bcrypt (recomendado)
         import bcrypt
         salt = bcrypt.gensalt()
         return bcrypt.hashpw(password.encode('utf-8'), salt).decode('utf-8')
     except ImportError:
-        # Fallback para hash simples (USAR APENAS PARA DESENVOLVIMENTO)
+        # Fallback (apenas para desenvolvimento)
         import hashlib
-        return hashlib.sha256(password.encode('utf-8')).hexdigest()
-    except Exception as e:
-        print(f"❌ [HASH_PASSWORD] Erro no hash: {e}")
-        raise ValueError("Erro ao processar senha")
+        import secrets
+        salt = secrets.token_hex(16)
+        return hashlib.pbkdf2_hex(password.encode('utf-8'), salt.encode('utf-8'), 100000) + ':' + salt
 
+def verify_password(password, hashed):
+    """Verifica senha contra hash"""
+    try:
+        import bcrypt
+        return bcrypt.checkpw(password.encode('utf-8'), hashed.encode('utf-8'))
+    except ImportError:
+        # Fallback para hash com salt
+        if ':' in hashed:
+            stored_hash, salt = hashed.rsplit(':', 1)
+            import hashlib
+            computed_hash = hashlib.pbkdf2_hex(password.encode('utf-8'), salt.encode('utf-8'), 100000)
+            return stored_hash == computed_hash
+        return False
 
 # ✅ ENDPOINT COMPLEMENTAR: Verificar token
 @app.route('/api/auth/verify-token', methods=['POST'])
