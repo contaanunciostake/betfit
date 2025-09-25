@@ -1,5 +1,5 @@
 // src/services/api.js ou src/services/apiClient.js
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5001'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://betfit-backend.onrender.com'
 const BYPASS_TUNNEL = import.meta.env.VITE_BYPASS_TUNNEL_REMINDER === '1'
 const IS_TUNNEL = API_BASE_URL.includes('loca.lt') || API_BASE_URL.includes('ngrok')
 
