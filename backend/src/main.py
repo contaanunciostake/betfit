@@ -2886,32 +2886,30 @@ def create_challenge():
             return jsonify({"error": f"Tipo de distribuição inválido. Use: {', '.join(valid_distribution_types)}"}), 400
         
         # 1. BUSCAR CATEGORIA REAL DA TABELA challenge_categories
-        category_id = int(data['category_id'])
 
-# Usar psycopg2 direto para evitar problemas SQLAlchemy
-try:
-    import psycopg2
-    temp_conn = psycopg2.connect(DATABASE_URL)
-    temp_cursor = temp_conn.cursor()
-    
-    temp_cursor.execute("""
-        SELECT id, name FROM challenge_categories 
-        WHERE id = %s AND (is_active = 'true' OR is_active = '1')
-    """, (category_id,))
-    
-    category_result = temp_cursor.fetchone()
-    temp_conn.close()
-    
-    if not category_result:
-        return jsonify({"error": f"Categoria ID {category_id} não encontrada ou inativa"}), 400
-    
-    category_name = category_result[1]
-    print(f"🏷️ [CREATE_CHALLENGE] Categoria encontrada: ID {category_id} = '{category_name}'")
-    
-except Exception as e:
-    print(f"❌ [CREATE_CHALLENGE] Erro ao buscar categoria: {e}")
-    return jsonify({"error": f"Erro ao validar categoria: {str(e)}"}), 400
-        print(f"🏷️ [CREATE_CHALLENGE] Categoria encontrada: ID {category_id} = '{category_name}'")
+        category_id = int(data['category_id'])
+        try:
+            import psycopg2
+            temp_conn = psycopg2.connect(DATABASE_URL)
+            temp_cursor = temp_conn.cursor()
+            
+            temp_cursor.execute("""
+                SELECT id, name FROM challenge_categories 
+                WHERE id = %s AND (is_active = 'true' OR is_active = '1')
+            """, (category_id,))
+            
+            category_result = temp_cursor.fetchone()
+            temp_conn.close()
+            
+            if not category_result:
+                return jsonify({"error": f"Categoria ID {category_id} não encontrada ou inativa"}), 400
+            
+            category_name = category_result[1]
+            print(f"🏷️ [CREATE_CHALLENGE] Categoria encontrada: ID {category_id} = '{category_name}'")
+            
+        except Exception as e:  # <- ADICIONE ESTA LINHA
+            print(f"❌ [CREATE_CHALLENGE] Erro ao buscar categoria: {e}")
+            return jsonify({"error": f"Erro ao validar categoria: {str(e)}"}), 400
         
         # 2. MAPEAR NOME DA CATEGORIA PARA STRING INTERNA
         category_string_map = {
