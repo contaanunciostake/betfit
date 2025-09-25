@@ -3686,7 +3686,10 @@ def create_challenge():
         required_fields = ['title', 'description', 'category_id', 'target_value', 'stake_min', 'stake_max', 'start_at']
         for field in required_fields:
             if field not in data or not data[field]:
-                return jsonify({"error": f"Campo obrigatório: {field}"}), 400
+                return jsonify({
+                    "success": False,
+                    "error": f"Campo obrigatório: {field}"
+                }), 400
         
         # PROCESSAR CAMPOS DE MÚLTIPLOS VENCEDORES
         max_winners = int(data.get('max_winners', 1))
@@ -3695,30 +3698,53 @@ def create_challenge():
         
         # Validações específicas para múltiplos vencedores
         if max_winners < 1 or max_winners > 50:
-            return jsonify({"error": "Número de vencedores deve estar entre 1 e 50"}), 400
+            return jsonify({
+                "success": False,
+                "error": "Número de vencedores deve estar entre 1 e 50"
+            }), 400
         
         max_participants = int(data.get('max_participants', 100))
         if max_winners > max_participants:
-            return jsonify({"error": "Número de vencedores não pode ser maior que máximo de participantes"}), 400
+            return jsonify({
+                "success": False,
+                "error": "Número de vencedores não pode ser maior que máximo de participantes"
+            }), 400
         
         valid_selection_types = ['first_to_complete', 'top_performers', 'all_qualifiers']
         if winner_selection_type not in valid_selection_types:
-            return jsonify({"error": f"Tipo de seleção inválido. Use: {', '.join(valid_selection_types)}"}), 400
+            return jsonify({
+                "success": False,
+                "error": f"Tipo de seleção inválido. Use: {', '.join(valid_selection_types)}"
+            }), 400
         
         valid_distribution_types = ['equal', 'proportional', 'ranking_based']
         if prize_distribution_type not in valid_distribution_types:
-            return jsonify({"error": f"Tipo de distribuição inválido. Use: {', '.join(valid_distribution_types)}"}), 400
+            return jsonify({
+                "success": False,
+                "error": f"Tipo de distribuição inválido. Use: {', '.join(valid_distribution_types)}"
+            }), 400
+        
+        # ✅ CORREÇÃO: Obter category_id dos dados
+        category_id = data.get('category_id')
+        if not category_id:
+            return jsonify({
+                "success": False,
+                "error": "category_id é obrigatório"
+            }), 400
         
         # 1. BUSCAR CATEGORIA REAL DA TABELA challenge_categories
         category = session.query(ChallengeCategory).filter(
-        ChallengeCategory.id == category_id,
-        ChallengeCategory.is_active == True
-    ).first()
-    
-    if not category:
-        return jsonify({"error": f"Categoria ID {category_id} não encontrada ou inativa"}), 400
-    
-    category_name = category.name
+            ChallengeCategory.id == category_id,
+            ChallengeCategory.is_active == True
+        ).first()
+        
+        if not category:
+            return jsonify({
+                "success": False,
+                "error": f"Categoria ID {category_id} não encontrada ou inativa"
+            }), 400
+        
+        category_name = category.name
         
         # 2. MAPEAR NOME DA CATEGORIA PARA STRING INTERNA
         category_string_map = {
@@ -3746,11 +3772,15 @@ def create_challenge():
             start_date = datetime.fromisoformat(data['start_at'].replace('Z', '+00:00'))
             start_date = start_date.replace(tzinfo=None)
             print(f"📅 [CREATE_CHALLENGE] Data de início: {start_date}")
-        except Exception as e:
-            print(f"❌ [CREATE_CHALLENGE] Erro ao processar data: {e}")
-            return jsonify({"error": "Data de início inválida"}), 400
+        except Exception as date_error:
+            print(f"❌ [CREATE_CHALLENGE] Erro ao processar data: {date_error}")
+            return jsonify({
+                "success": False,
+                "error": "Data de início inválida. Use formato ISO: YYYY-MM-DDTHH:MM:SS"
+            }), 400
         
         # 4. DETERMINAR STATUS
+        from datetime import datetime, timedelta
         now = datetime.utcnow()
         is_future = start_date > now
         status = 'pending' if is_future else 'active'
@@ -3762,7 +3792,8 @@ def create_challenge():
         print(f"   - Seleção: {winner_selection_type}")
         print(f"   - Distribuição: {prize_distribution_type}")
         
-        # Criar novo desafio COM CAMPOS DE MÚLTIPLOS VENCEDORES
+        # 5. CRIAR NOVO DESAFIO COM CAMPOS DE MÚLTIPLOS VENCEDORES
+        import uuid
         new_challenge = Challenge(
             id=str(uuid.uuid4()),
             title=data['title'].strip(),
@@ -3780,8 +3811,8 @@ def create_challenge():
             prize_distribution='winner_takes_all',
             created_at=datetime.utcnow(),
             updated_at=datetime.utcnow(),
-            created_by='admin',
-            auto_validation=True,
+            created_by=data.get('created_by', 'admin'),
+            auto_validation=data.get('auto_validation', True),
             target_metric=data.get('target_unit', 'km'),
             target_value=float(data['target_value']),
             target_unit=data.get('target_unit', 'km'),
@@ -3797,6 +3828,7 @@ def create_challenge():
         session.commit()
         
         print(f"✅ [CREATE_CHALLENGE] Desafio criado com múltiplos vencedores:")
+        print(f"   - ID: {new_challenge.id}")
         print(f"   - Título: {new_challenge.title}")
         print(f"   - Categoria: {category_name} → {category_string}")
         print(f"   - Status: {new_challenge.status}")
@@ -3804,7 +3836,7 @@ def create_challenge():
         print(f"   - Seleção: {winner_selection_type}")
         print(f"   - Distribuição: {prize_distribution_type}")
         
-        # Retornar dados com categoria mapeada
+        # 6. MONTAR RESPOSTA ESTRUTURADA
         challenge_data = {
             'id': new_challenge.id,
             'title': new_challenge.title,
@@ -3813,20 +3845,20 @@ def create_challenge():
             'category_name': category_name,
             'category_id': category_id,
             'difficulty': new_challenge.difficulty,
-            'entry_fee': new_challenge.entry_fee,
-            'total_pool': new_challenge.total_pool,
+            'entry_fee': float(new_challenge.entry_fee),
+            'total_pool': float(new_challenge.total_pool),
             'max_participants': new_challenge.max_participants,
             'current_participants': new_challenge.current_participants,
             'start_date': new_challenge.start_date.isoformat() if new_challenge.start_date else None,
             'end_date': new_challenge.end_date.isoformat() if new_challenge.end_date else None,
             'status': new_challenge.status,
-            'target_value': new_challenge.target_value,
+            'target_value': float(new_challenge.target_value),
             'target_unit': new_challenge.target_unit,
             'validation_rules': new_challenge.validation_rules,
             'created_at': new_challenge.created_at.isoformat() if new_challenge.created_at else None,
             'start_at': new_challenge.start_date.isoformat() if new_challenge.start_date else None,
             'is_scheduled': is_future,
-            'time_until_start': (start_date - now).total_seconds() if is_future else 0,
+            'time_until_start': int((start_date - now).total_seconds()) if is_future else 0,
             # CAMPOS DE MÚLTIPLOS VENCEDORES
             'max_winners': max_winners,
             'winner_selection_type': winner_selection_type,
@@ -3834,6 +3866,7 @@ def create_challenge():
             'multiple_winners_enabled': max_winners > 1
         }
         
+        # 7. CRIAR MENSAGEM INFORMATIVA
         message = f"Desafio criado na categoria '{category_name}'! Status: {'Agendado' if is_future else 'Ativo'}"
         if max_winners > 1:
             message += f" | {max_winners} vencedores ({winner_selection_type})"
@@ -3841,17 +3874,135 @@ def create_challenge():
         return jsonify({
             "success": True,
             "message": message,
-            "challenge": challenge_data
+            "data": {
+                "challenge": challenge_data
+            }
         }), 201
+        
+    except ValueError as ve:
+        session.rollback()
+        print(f"❌ [CREATE_CHALLENGE] Erro de validação: {ve}")
+        return jsonify({
+            "success": False,
+            "error": "Dados inválidos fornecidos",
+            "details": str(ve) if app.debug else None
+        }), 400
         
     except Exception as e:
         session.rollback()
         print(f"❌ [CREATE_CHALLENGE] Erro ao criar desafio: {e}")
         import traceback
-        traceback.print_exc()
-        return jsonify({"error": f"Erro ao criar desafio: {str(e)}"}), 500
+        error_trace = traceback.format_exc()
+        print(f"❌ [CREATE_CHALLENGE] Stack trace: {error_trace}")
+        return jsonify({
+            "success": False,
+            "error": "Erro interno do servidor",
+            "details": error_trace if app.debug else None
+        }), 500
     finally:
         session.close()
+
+
+# ✅ ENDPOINT AUXILIAR: Listar categorias disponíveis
+@app.route('/api/challenges/categories', methods=['GET'])
+def get_challenge_categories():
+    """Listar categorias de desafios disponíveis"""
+    session = SessionLocal()
+    try:
+        categories = session.query(ChallengeCategory)\
+            .filter(ChallengeCategory.is_active == True)\
+            .order_by(ChallengeCategory.name)\
+            .all()
+        
+        categories_data = []
+        for category in categories:
+            categories_data.append({
+                'id': category.id,
+                'name': category.name,
+                'description': getattr(category, 'description', ''),
+                'icon': getattr(category, 'icon', '🏃'),
+                'is_active': category.is_active
+            })
+        
+        return jsonify({
+            "success": True,
+            "message": f"{len(categories_data)} categorias encontradas",
+            "data": {
+                "categories": categories_data
+            }
+        }), 200
+        
+    except Exception as e:
+        print(f"❌ [GET_CATEGORIES] Erro: {e}")
+        return jsonify({
+            "success": False,
+            "error": "Erro interno do servidor"
+        }), 500
+    finally:
+        session.close()
+
+
+# ✅ ENDPOINT AUXILIAR: Validar configuração de múltiplos vencedores
+@app.route('/api/challenges/validate-winners-config', methods=['POST'])
+def validate_winners_config():
+    """Validar configuração de múltiplos vencedores antes de criar desafio"""
+    try:
+        data = request.get_json()
+        
+        max_winners = int(data.get('max_winners', 1))
+        max_participants = int(data.get('max_participants', 100))
+        winner_selection_type = data.get('winner_selection_type', 'first_to_complete')
+        prize_distribution_type = data.get('prize_distribution_type', 'equal')
+        
+        errors = []
+        warnings = []
+        
+        # Validações
+        if max_winners < 1:
+            errors.append("Número de vencedores deve ser pelo menos 1")
+        elif max_winners > 50:
+            errors.append("Número máximo de vencedores é 50")
+        
+        if max_participants < max_winners:
+            errors.append("Número de vencedores não pode exceder máximo de participantes")
+        
+        if winner_selection_type not in ['first_to_complete', 'top_performers', 'all_qualifiers']:
+            errors.append("Tipo de seleção de vencedores inválido")
+        
+        if prize_distribution_type not in ['equal', 'proportional', 'ranking_based']:
+            errors.append("Tipo de distribuição de prêmios inválido")
+        
+        # Avisos
+        if max_winners > max_participants * 0.5:
+            warnings.append("Mais de 50% dos participantes serão vencedores")
+        
+        if max_winners > 10:
+            warnings.append("Muitos vencedores podem diluir significativamente o prêmio")
+        
+        is_valid = len(errors) == 0
+        
+        return jsonify({
+            "success": True,
+            "data": {
+                "is_valid": is_valid,
+                "errors": errors,
+                "warnings": warnings,
+                "configuration": {
+                    "max_winners": max_winners,
+                    "max_participants": max_participants,
+                    "winner_selection_type": winner_selection_type,
+                    "prize_distribution_type": prize_distribution_type,
+                    "multiple_winners_enabled": max_winners > 1
+                }
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": "Erro na validação",
+            "details": str(e)
+        }), 400
 
 # ADICIONE TAMBÉM O HANDLER OPTIONS PARA CORS
 @app.route('/api/challenges', methods=['OPTIONS'])
