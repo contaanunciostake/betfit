@@ -352,6 +352,215 @@ def handle_settings_section(section):
         logging.error(traceback.format_exc())
         return jsonify({'success': False, 'error': 'Erro interno do servidor.'}), 500
 
+        # Rotas para integração Strava
+@app.route('/api/auth/strava/callback', methods=['GET'])
+def strava_callback():
+    """Callback do OAuth do Strava"""
+    try:
+        code = request.args.get('code')
+        state = request.args.get('state')
+        
+        if not code:
+            return jsonify({'error': 'Código de autorização não fornecido'}), 400
+        
+        # Decodificar state
+        try:
+            state_data = json.loads(base64.b64decode(state).decode())
+            user_email = state_data['user_email']
+        except:
+            return jsonify({'error': 'State inválido'}), 400
+        
+        # Trocar código por access token
+        token_data = {
+            'client_id': os.getenv('STRAVA_CLIENT_ID'),
+            'client_secret': os.getenv('STRAVA_CLIENT_SECRET'),
+            'code': code,
+            'grant_type': 'authorization_code'
+        }
+        
+        response = requests.post('https://www.strava.com/oauth/token', data=token_data)
+        
+        if response.status_code == 200:
+            token_info = response.json()
+            
+            # Salvar conexão no banco
+            session = SessionLocal()
+            try:
+                user = session.query(User).filter_by(email=user_email).first()
+                if not user:
+                    return jsonify({'error': 'Usuário não encontrado'}), 404
+                
+                # Criar conexão Strava
+                connection = FitnessConnection(
+                    user_id=user.id,
+                    platform='strava',
+                    platform_user_id=str(token_info['athlete']['id']),
+                    access_token=token_info['access_token'],
+                    refresh_token=token_info.get('refresh_token'),
+                    token_expires_at=datetime.utcfromtimestamp(token_info['expires_at']),
+                    is_active=True,
+                    permissions=json.dumps(['read', 'activity:read'])
+                )
+                
+                session.add(connection)
+                session.commit()
+                
+                # Fechar popup
+                return """
+                <script>
+                    window.opener.postMessage({type: 'strava_success'}, '*');
+                    window.close();
+                </script>
+                """
+                
+            finally:
+                session.close()
+        
+        return jsonify({'error': 'Falha na autorização'}), 400
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/fitness/strava/sync', methods=['POST'])
+def sync_strava_activities():
+    """Sincronizar atividades do Strava e verificar desafios"""
+    session = SessionLocal()
+    try:
+        data = request.get_json()
+        user_email = data.get('user_email')
+        
+        user = session.query(User).filter_by(email=user_email).first()
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+        
+        # Buscar conexão Strava
+        connection = session.query(FitnessConnection).filter_by(
+            user_id=user.id,
+            platform='strava',
+            is_active=True
+        ).first()
+        
+        if not connection:
+            return jsonify({'error': 'Conexão Strava não encontrada'}), 404
+        
+        # Buscar atividades recentes do Strava
+        headers = {'Authorization': f'Bearer {connection.access_token}'}
+        strava_response = requests.get(
+            'https://www.strava.com/api/v3/athlete/activities',
+            headers=headers,
+            params={'per_page': 10}
+        )
+        
+        if strava_response.status_code != 200:
+            return jsonify({'error': 'Falha ao buscar atividades do Strava'}), 400
+        
+        activities = strava_response.json()
+        challenge_completions = []
+        
+        # Processar cada atividade
+        for activity in activities:
+            # Verificar se atividade já foi processada
+            existing_data = session.query(FitnessData).filter_by(
+                user_id=user.id,
+                external_id=str(activity['id'])
+            ).first()
+            
+            if existing_data:
+                continue
+            
+            # Criar registro de dados fitness
+            fitness_data = FitnessData(
+                id=str(uuid.uuid4()),
+                user_id=user.id,
+                connection_id=connection.id,
+                external_id=str(activity['id']),
+                data_type=map_strava_type(activity['type']),
+                value=activity['distance'] / 1000,  # Converter para km
+                unit='km',
+                start_time=datetime.fromisoformat(activity['start_date'].replace('Z', '+00:00')),
+                end_time=datetime.fromisoformat(activity['start_date'].replace('Z', '+00:00')) + 
+                        timedelta(seconds=activity['elapsed_time']),
+                source_app='strava',
+                raw_data=json.dumps(activity)
+            )
+            
+            session.add(fitness_data)
+            
+            # Verificar se completa algum desafio
+            completed_challenges = check_challenge_completion(session, user.id, fitness_data)
+            challenge_completions.extend(completed_challenges)
+        
+        session.commit()
+        
+        return jsonify({
+            'success': True,
+            'activities_processed': len([a for a in activities]),
+            'challenge_completions': challenge_completions
+        })
+        
+    except Exception as e:
+        session.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+def map_strava_type(strava_type):
+    """Mapear tipos de atividade do Strava para tipos internos"""
+    mapping = {
+        'Run': 'running',
+        'Ride': 'cycling',
+        'Walk': 'walking',
+        'Swim': 'swimming',
+        'Workout': 'fitness'
+    }
+    return mapping.get(strava_type, 'fitness')
+
+def check_challenge_completion(session, user_id, fitness_data):
+    """Verificar se uma atividade completa algum desafio"""
+    completions = []
+    
+    # Buscar participações ativas do usuário
+    participations = session.query(ChallengeParticipation).filter_by(
+        user_id=user_id,
+        status='active'
+    ).all()
+    
+    for participation in participations:
+        challenge = session.query(Challenge).filter_by(id=participation.challenge_id).first()
+        
+        if not challenge or challenge.status != 'active':
+            continue
+        
+        # Verificar se atividade atende aos critérios
+        if (challenge.target_metric == fitness_data.data_type and 
+            fitness_data.value >= challenge.target_value):
+            
+            # Completar desafio
+            participation.status = 'completed'
+            participation.completed_at = datetime.utcnow()
+            participation.result_value = fitness_data.value
+            
+            # Calcular prêmio
+            prize_amount = calculate_prize(session, challenge)
+            
+            # Atualizar carteira
+            wallet = session.query(Wallet).filter_by(user_id=user_id).first()
+            if wallet:
+                wallet.balance += prize_amount
+                wallet.updated_at = datetime.utcnow()
+            
+            # Marcar desafio como completado
+            challenge.status = 'completed'
+            challenge.updated_at = datetime.utcnow()
+            
+            completions.append({
+                'challenge_id': challenge.id,
+                'challenge_title': challenge.title,
+                'prize_amount': prize_amount
+            })
+    
+    return completions
+
 @app.route('/api/admin/settings/<section>/<key>', methods=['GET', 'PUT', 'OPTIONS'])
 @cross_origin(origins=["http://localhost:3000", "http://localhost:5173", "http://localhost:8080", "http://192.168.1.69:8080", "http://localhost:5174", "http://localhost:5001"])
 def handle_single_setting(section, key):
