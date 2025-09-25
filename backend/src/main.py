@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configurar DATABASE_PATH com .env
-DATABASE_PATH = os.getenv('DATABASE_PATH', './betfit.db')
+DATABASE_PATH = os.path.join(os.path.dirname(__file__), 'betfit.db')
 
 #!/usr/bin/env python3
 import hashlib
