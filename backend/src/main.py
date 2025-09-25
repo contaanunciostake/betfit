@@ -4218,13 +4218,15 @@ def get_db_connection():
 
 @app.route('/api/categories', methods=['GET', 'POST'])
 def handle_categories():
-    """CRUD completo para categorias usando banco de dados"""
+    """CRUD completo para categorias usando PostgreSQL"""
     
     if request.method == 'GET':
         try:
-            print("📂 [CATEGORIES] Buscando categorias do banco de dados com contagem...")
+            print("📂 [CATEGORIES] Buscando categorias PostgreSQL...")
             
-            conn = get_db_connection()
+            # USAR POSTGRESQL DIRETAMENTE
+            import psycopg2
+            conn = psycopg2.connect(DATABASE_URL)
             cursor = conn.cursor()
             
             # PRIMEIRO: Debug - Ver quantos desafios existem por categoria
@@ -4233,25 +4235,31 @@ def handle_categories():
             debug_counts = cursor.fetchall()
             print("📊 [DEBUG] Contagem real na tabela challenges:")
             for row in debug_counts:
-                print(f"   - '{row['category']}': {row['count']} desafios")
+                print(f"   - '{row[0]}': {row[1]} desafios")
             
-            # SEGUNDO: Buscar categorias com JOIN simples primeiro
+            # SEGUNDO: Buscar categorias (CORRIGIDO PARA POSTGRESQL)
             cursor.execute('''
                 SELECT 
-                    c.id, c.name, c.description, c.color, c.icon, 
-                    c.is_active, c.created_at, c.updated_at
-                FROM challenge_categories c
-                ORDER BY c.is_active DESC, c.name
+                    id, name, description, color, icon, 
+                    is_active, created_at, updated_at
+                FROM challenge_categories
+                ORDER BY is_active DESC, name
             ''')
             
             categories = []
             for row in cursor.fetchall():
-                # Conversão correta do is_active
-                raw_is_active = row['is_active']
-                is_active_bool = str(raw_is_active) == '1'
+                # PostgreSQL retorna tuplas, não dicionários
+                category_id = row[0]
+                category_name = row[1]
+                description = row[2]
+                color = row[3]
+                icon = row[4]
+                raw_is_active = row[5]
+                created_at = row[6]
+                updated_at = row[7]
                 
-                # Para cada categoria, contar desafios manualmente
-                category_name = row['name']
+                # Conversão correta do is_active para PostgreSQL
+                is_active_bool = str(raw_is_active).lower() in ['true', '1', 't']
                 
                 # Mapeamento mais lógico baseado no nome
                 challenge_types = []
@@ -4262,40 +4270,38 @@ def handle_categories():
                 elif category_name == 'Caminhada':
                     challenge_types = ['steps']
                 elif category_name == 'Fitness':
-                    challenge_types = ['calories']  # Fitness geralmente é sobre queimar calorias
+                    challenge_types = ['fitness']
                 elif category_name == 'Yoga':
-                    challenge_types = ['calories']  # Yoga para relaxamento e calorias
+                    challenge_types = ['calories']
                 elif category_name == 'Natação':
-                    challenge_types = ['running']   # Natação como cardio similar à corrida
-                elif category_name == 'Voador':
-                    challenge_types = []            # Categoria especial, sem desafios por enquanto
+                    challenge_types = ['swimming']
                 
-                # Contar desafios para esta categoria
+                # Contar desafios para esta categoria (CORRIGIDO PARA POSTGRESQL)
                 challenges_count = 0
                 if challenge_types:
-                    placeholders = ','.join(['?' for _ in challenge_types])
-                    count_query = f'SELECT COUNT(*) as count FROM challenges WHERE category IN ({placeholders})'
-                    cursor.execute(count_query, challenge_types)
+                    placeholders = ','.join(['%s' for _ in challenge_types])  # %s ao invés de ?
+                    count_query = f'SELECT COUNT(*) as count FROM challenges WHERE category = ANY(%s)'
+                    cursor.execute(count_query, (challenge_types,))
                     count_result = cursor.fetchone()
-                    challenges_count = count_result['count'] if count_result else 0
+                    challenges_count = count_result[0] if count_result else 0
                 
                 print(f"🏷️ [DEBUG] {category_name} -> tipos {challenge_types} -> {challenges_count} desafios")
                 
                 categories.append({
-                    'id': row['id'],
-                    'name': row['name'],
-                    'description': row['description'],
-                    'color': row['color'],
-                    'icon': row['icon'],
+                    'id': category_id,
+                    'name': category_name,
+                    'description': description,
+                    'color': color,
+                    'icon': icon,
                     'is_active': is_active_bool,
                     'challenges_count': challenges_count,
-                    'created_at': row['created_at'],
-                    'updated_at': row['updated_at']
+                    'created_at': str(created_at) if created_at else None,
+                    'updated_at': str(updated_at) if updated_at else None
                 })
             
             conn.close()
             
-            print(f"✅ [CATEGORIES] {len(categories)} categorias encontradas no banco")
+            print(f"✅ [CATEGORIES] {len(categories)} categorias encontradas no PostgreSQL")
             
             # Debug: mostrar o status de cada categoria
             for cat in categories:
@@ -4309,12 +4315,14 @@ def handle_categories():
             })
             
         except Exception as e:
-            print(f"❌ [CATEGORIES] Erro ao buscar categorias do banco: {e}")
+            print(f"❌ [CATEGORIES] Erro PostgreSQL: {e}")
+            import traceback
+            traceback.print_exc()
             return jsonify({"error": f"Erro ao buscar categorias: {str(e)}"}), 500
     
     elif request.method == 'POST':
         try:
-            print("➕ [CATEGORIES] Criando nova categoria no banco...")
+            print("➕ [CATEGORIES] Criando nova categoria PostgreSQL...")
             
             data = request.get_json()
             
@@ -4322,66 +4330,60 @@ def handle_categories():
             if not data.get('name') or not data.get('description'):
                 return jsonify({"error": "Nome e descrição são obrigatórios"}), 400
             
-            conn = get_db_connection()
+            # USAR POSTGRESQL DIRETAMENTE
+            import psycopg2
+            conn = psycopg2.connect(DATABASE_URL)
             cursor = conn.cursor()
             
-            # Verificar se já existe
-            cursor.execute('SELECT id FROM challenge_categories WHERE name = ?', (data['name'],))
+            # Verificar se já existe (CORRIGIDO PARA POSTGRESQL)
+            cursor.execute('SELECT id FROM challenge_categories WHERE name = %s', (data['name'],))
             if cursor.fetchone():
                 conn.close()
                 return jsonify({"error": "Categoria com este nome já existe"}), 409
             
-            ## Buscar próximo ID disponível (já que não é AUTOINCREMENT)
-            cursor.execute('SELECT MAX(id) as max_id FROM challenge_categories')
-            result = cursor.fetchone()
-            max_id = result['max_id'] if result['max_id'] is not None else 0
-            next_id = int(max_id) + 1
-            
-            # Inserir nova categoria
+            # Inserir nova categoria (POSTGRESQL COM SERIAL/AUTO-INCREMENT)
             cursor.execute('''
-                INSERT INTO challenge_categories (id, name, description, color, icon, is_active, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
+                INSERT INTO challenge_categories (name, description, color, icon, is_active, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                RETURNING id, name, description, color, icon, is_active, created_at
             ''', (
-                next_id,
                 data['name'].strip(),
                 data['description'].strip(),
                 data.get('color', '#3b82f6'),
-                data.get('icon', 'trophy')
+                data.get('icon', 'trophy'),
+                'true'  # PostgreSQL usa string 'true'
             ))
             
-            conn.commit()
-            
-            # Buscar a categoria criada
-            cursor.execute('''
-                SELECT id, name, description, color, icon, is_active, created_at 
-                FROM challenge_categories 
-                WHERE id = ?
-            ''', (next_id,))
-            
             row = cursor.fetchone()
-            category = {
-                'id': row['id'],
-                'name': row['name'],
-                'description': row['description'],
-                'color': row['color'],
-                'icon': row['icon'],
-                'is_active': str(row['is_active']) == '1',
-                'created_at': row['created_at']
-            }
-            
+            conn.commit()
             conn.close()
             
-            print(f"✅ [CATEGORIES] Categoria '{data['name']}' criada com ID {next_id}")
-            return jsonify({
-                "success": True,
-                "message": "Categoria criada com sucesso",
-                "category": category
-            }), 201
+            if row:
+                category = {
+                    'id': row[0],
+                    'name': row[1],
+                    'description': row[2],
+                    'color': row[3],
+                    'icon': row[4],
+                    'is_active': str(row[5]).lower() in ['true', '1', 't'],
+                    'created_at': str(row[6]) if row[6] else None
+                }
+                
+                print(f"✅ [CATEGORIES] Categoria '{data['name']}' criada com ID {row[0]}")
+                return jsonify({
+                    "success": True,
+                    "message": "Categoria criada com sucesso",
+                    "category": category
+                }), 201
+            else:
+                return jsonify({"error": "Falha ao criar categoria"}), 500
             
         except Exception as e:
-            print(f"❌ [CATEGORIES] Erro ao criar categoria: {e}")
+            print(f"❌ [CATEGORIES] Erro ao criar categoria PostgreSQL: {e}")
+            import traceback
+            traceback.print_exc()
             return jsonify({"error": f"Erro ao criar categoria: {str(e)}"}), 500
-
+            
 @app.route('/api/categories/<int:category_id>', methods=['PUT', 'DELETE'])
 def handle_category_by_id(category_id):
     """Editar ou excluir categoria específica"""
