@@ -10,6 +10,10 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  // Correção para disponibilizar process.env no build
+  define: {
+    'process.env': process.env
+  },
   server: {
     host: '0.0.0.0',
     port: 5173,
