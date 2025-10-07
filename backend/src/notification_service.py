@@ -4,7 +4,7 @@
 
 from datetime import datetime, timedelta
 from sqlalchemy import and_, or_
-from models import SessionLocal, User, Challenge, Participation, Message
+from models import SessionLocal, User, Challenge, ChallengeParticipation as Participation, Message
 import logging
 
 logger = logging.getLogger(__name__)

@@ -37,6 +37,10 @@ class User(Base):
     birthdate = Column(DateTime, nullable=True)  # Data de nascimento
     pix_key = Column(String, nullable=True)  # Chave PIX para saques
 
+    # Campos de gamificação
+    xp = Column(Integer, default=0)  # Pontos de experiência
+    badges = Column(Text, nullable=True)  # JSON array de badges conquistados
+
     # Relacionamentos existentes
     wallets = relationship("Wallet", back_populates="user")
     transactions = relationship("Transaction", back_populates="user")

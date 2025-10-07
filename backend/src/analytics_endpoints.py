@@ -4,7 +4,7 @@
 from flask import request, jsonify
 from sqlalchemy import func
 from datetime import datetime, timedelta
-from models import SessionLocal, User, Participation, Transaction, Challenge
+from models import SessionLocal, User, ChallengeParticipation as Participation, Transaction, Challenge
 
 def get_user_analytics(user_email):
     """GET /api/analytics/<user_email> - Estatísticas completas do usuário"""

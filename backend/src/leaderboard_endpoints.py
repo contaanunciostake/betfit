@@ -4,7 +4,7 @@
 from flask import request, jsonify
 from sqlalchemy import func
 from datetime import datetime, timedelta
-from models import SessionLocal, User, Participation
+from models import SessionLocal, User, ChallengeParticipation as Participation
 
 def get_leaderboard():
     """GET /api/leaderboard - Retorna ranking de usuários"""

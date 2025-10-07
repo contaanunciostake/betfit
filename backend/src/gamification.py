@@ -3,7 +3,7 @@
 
 from sqlalchemy import func
 from datetime import datetime, timedelta
-from models import SessionLocal, User, Participation, Challenge
+from models import SessionLocal, User, ChallengeParticipation as Participation, Challenge
 import json
 
 # ==================== CONSTANTES ====================

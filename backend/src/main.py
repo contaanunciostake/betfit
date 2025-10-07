@@ -147,6 +147,39 @@ register_chat_routes(app)
 # Configurar eventos WebSocket
 setup_socketio_events(socketio)
 
+# ==================== INTEGRAÇÃO NOTIFICAÇÕES, LEADERBOARD, GAMIFICAÇÃO, ANALYTICS ====================
+from notification_service import init_notification_service, register_notification_routes
+from leaderboard_endpoints import register_leaderboard_routes
+from gamification import register_gamification_routes
+from analytics_endpoints import register_analytics_routes
+import threading
+
+# Inicializar serviço de notificações
+notification_service = init_notification_service(socketio)
+register_notification_routes(app, notification_service)
+
+# Registrar outras rotas
+register_leaderboard_routes(app)
+register_gamification_routes(app)
+register_analytics_routes(app)
+
+print("[OK] Notificações, Leaderboard, Gamificação e Analytics integrados!")
+
+# Worker de notificações (cronjob)
+def notification_worker():
+    """Verifica alertas de tempo a cada 1 minuto"""
+    while True:
+        try:
+            notification_service.check_challenge_time_alerts()
+        except Exception as e:
+            print(f"[ERROR] Notification worker: {e}")
+        time.sleep(60)
+
+# Iniciar worker em background
+notification_thread = threading.Thread(target=notification_worker, daemon=True)
+notification_thread.start()
+print("[OK] Cronjob de notificações iniciado!")
+
 # ================== NOVA ROTA PARA SERVIR ARQUIVOS DE UPLOAD ==================
 @app.route('/uploads/logos/<path:filename>')
 def serve_logo(filename):
