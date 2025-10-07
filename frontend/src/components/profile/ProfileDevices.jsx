@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Activity, Heart, Zap, Watch, CheckCircle, XCircle, Loader } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const ProfileDevices = () => {
   const { user } = useAuth();
