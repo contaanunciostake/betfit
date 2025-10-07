@@ -361,10 +361,12 @@ def fitbit_callback():
     try:
         code = request.args.get('code')
         state = request.args.get('state')
-        user_email = state
+        user_email = state  # O state contém o email
         
         print(f"🔄 [FITBIT] Processando callback para: {user_email}")
         print(f"🔍 [FITBIT] Code: {code[:20] if code else 'NONE'}...")
+        print(f"🔑 [FITBIT] Usando Client ID: {FITBIT_CLIENT_ID}")
+        print(f"🔗 [FITBIT] Redirect URI: {FITBIT_REDIRECT_URI}")
         
         if not code:
             print(f"❌ [FITBIT] Código de autorização não recebido")
@@ -730,7 +732,7 @@ def get_fitness_connections(user_email):
     finally:
         session_db.close()
 
-        
+
 @app.route('/api/strava/webhook', methods=['GET', 'POST'])
 def strava_webhook():
     """Receber notificações em tempo real do Strava"""
@@ -6449,12 +6451,39 @@ print("🔒 Configurações salvas no banco SQLite com segurança")
 # Importar modelos Fitbit
 from models import FitbitUser, FitbitActivity, FitbitSubscription
 
-# Configurações Fitbit
-FITBIT_CLIENT_ID = os.getenv('FITBIT_CLIENT_ID', '23TG6L')
-FITBIT_CLIENT_SECRET = os.getenv('FITBIT_CLIENT_SECRET', '865176f8088f0d18023a42586addbae8')
-FITBIT_REDIRECT_URI = os.getenv('FITBIT_REDIRECT_URI', 'https://betfit-frontend-thwz.onrender.com/fitbit/callback')
-FITBIT_WEBHOOK_VERIFY_CODE = os.getenv('FITBIT_WEBHOOK_VERIFY_CODE', 'betfit_secret_2025')
+# ==================== CONFIGURAÇÕES FITBIT ====================
+# ATENÇÃO: Verificar no painel do Fitbit: https://dev.fitbit.com/apps
 
+# PASSO 1: Buscar credenciais do .env primeiro, depois usar fallback
+FITBIT_CLIENT_ID = os.getenv('FITBIT_CLIENT_ID')
+FITBIT_CLIENT_SECRET = os.getenv('FITBIT_CLIENT_SECRET')
+FITBIT_REDIRECT_URI = os.getenv('FITBIT_REDIRECT_URI')
+
+# PASSO 2: Se não houver no .env, usar valores padrão (DESENVOLVIMENTO APENAS)
+if not FITBIT_CLIENT_ID:
+    print("⚠️ [FITBIT] FITBIT_CLIENT_ID não encontrado no .env, usando fallback")
+    FITBIT_CLIENT_ID = '23TG6L'
+
+if not FITBIT_CLIENT_SECRET:
+    print("⚠️ [FITBIT] FITBIT_CLIENT_SECRET não encontrado no .env, usando fallback")
+    FITBIT_CLIENT_SECRET = '865176f8088f0d18023a42586addbae8'
+
+if not FITBIT_REDIRECT_URI:
+    print("⚠️ [FITBIT] FITBIT_REDIRECT_URI não encontrado no .env, usando fallback")
+    FITBIT_REDIRECT_URI = 'https://betfit-frontend-thwz.onrender.com/fitbit/callback'
+
+# PASSO 3: Validar se as credenciais estão corretas
+print(f"🔐 [FITBIT] Credenciais carregadas:")
+print(f"   - Client ID: {FITBIT_CLIENT_ID}")
+print(f"   - Redirect URI: {FITBIT_REDIRECT_URI}")
+print(f"   - Client Secret: ***{FITBIT_CLIENT_SECRET[-4:] if FITBIT_CLIENT_SECRET else 'MISSING'}***")
+
+# PASSO 4: Verificar se Redirect URI está no formato correto
+if not FITBIT_REDIRECT_URI.startswith('https://'):
+    print("❌ [FITBIT] ERRO: Redirect URI deve começar com https://")
+    print(f"   URI atual: {FITBIT_REDIRECT_URI}")
+
+FITBIT_WEBHOOK_VERIFY_CODE = os.getenv('FITBIT_WEBHOOK_VERIFY_CODE', 'betfit_secret_2025')
 @app.route('/api/fitbit/connect', methods=['GET'])
 def fitbit_connect():
     """Gera URL de autorização Fitbit"""
