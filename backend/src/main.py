@@ -40,6 +40,7 @@ import logging
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS, cross_origin
+from flask_socketio import SocketIO
 from sqlalchemy import or_, func, text
 from werkzeug.utils import secure_filename
 
@@ -47,7 +48,7 @@ from werkzeug.utils import secure_filename
 from models import (
     User, Wallet, Transaction, Challenge,
     ChallengeParticipation, FitnessConnection, FitnessData,
-    SessionLocal
+    Message, SessionLocal
 )
 
 import sys
@@ -64,6 +65,9 @@ UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'upload
 app = Flask(__name__)
 app.secret_key = os.getenv('SECRET_KEY', '1657victOr@')
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# Configurar SocketIO para WebSocket do chat
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # Imports do MercadoPago
 import mercadopago
@@ -133,6 +137,15 @@ def serve_upload(filename):
 
 settings_manager = SystemSettings(DATABASE_URL)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# ==================== INTEGRAÇÃO DO CHAT (REST + WEBSOCKET) ====================
+from chat_endpoints import register_chat_routes, setup_socketio_events
+
+# Registrar rotas REST do chat
+register_chat_routes(app)
+
+# Configurar eventos WebSocket
+setup_socketio_events(socketio)
 
 # ================== NOVA ROTA PARA SERVIR ARQUIVOS DE UPLOAD ==================
 @app.route('/uploads/logos/<path:filename>')
@@ -8044,14 +8057,15 @@ if __name__ == '__main__':
             print("   - Cookies configurados para HTTPS")
     
     print(f"[ROCKET] Servidor iniciando na porta {port}")
+    print("[CHAT] Chat WebSocket ativado")
     print("=" * 50)
-    
-    # Configura��o otimizada para produ��o
-    app.run(
-        host='0.0.0.0', 
-        port=port, 
+
+    # Configura��o otimizada para produ��o com SocketIO
+    socketio.run(
+        app,
+        host='0.0.0.0',
+        port=port,
         debug=debug_mode if not is_production else False,
-        threaded=True,
         use_reloader=False if is_production else debug_mode
     )
 
