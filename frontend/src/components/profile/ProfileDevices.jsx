@@ -217,16 +217,18 @@ const ProfileDevices = ({ devices = [], onConnectDevice, onDisconnectDevice }) =
     }
   };
 
-  // CORREÇÃO: Função para obter nome de exibição do dispositivo
-  const getDeviceDisplayName = (platform) => {
-    const deviceMap = {
-      'teste': 'Teste',
-      'apple_health': 'Apple Saúde',
-      'health_connect': 'Health Connect',
-      'strava': 'Strava'
-    };
-    return deviceMap[platform] || platform;
+  // DEPOIS (código correto - COM FITBIT):
+const getDeviceDisplayName = (platform) => {
+  const deviceMap = {
+    'teste': 'Teste',
+    'apple_health': 'Apple Saúde',
+    'health_connect': 'Health Connect',
+    'strava': 'Strava',
+    'fitbit': 'Fitbit'  // ← ADICIONAR ESTA LINHA
   };
+  return deviceMap[platform] || platform;
+};
+
 
   // CORREÇÃO: Salvar no localStorage com formato consistente
   const saveToLocalStorage = (connections) => {
