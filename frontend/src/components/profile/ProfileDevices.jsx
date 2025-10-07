@@ -1,1242 +1,386 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { 
-  Smartphone, 
-  Apple, 
-  Activity, 
-  CheckCircle, 
-  XCircle, 
-  AlertCircle,
-  RefreshCw,
-  Shield,
-  Clock,
-  Zap,
-  Plus,
-  Loader2,
-  Power,
-  ExternalLink,
-  TestTube
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Activity, Heart, Zap, Watch, CheckCircle, XCircle, Loader } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
-const ProfileDevices = ({ devices = [], onConnectDevice, onDisconnectDevice }) => {
+const ProfileDevices = () => {
   const { user } = useAuth();
-  const [fitnessConnections, setFitnessConnections] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [connecting, setConnecting] = useState(null);
+  const [connections, setConnections] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
-  const [lastSync, setLastSync] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
 
-  // Verificar se é app nativo
-  const isNativeApp = () => {
-    return window.webkit?.messageHandlers?.healthKit !== undefined;
-  };
+  // Configuração da API
+  const API_URL = import.meta.env.VITE_API_URL || 
+                  import.meta.env.REACT_APP_API_URL || 
+                  'https://betfit-backend.onrender.com';
 
-  const isWebBrowser = () => {
-    return !isNativeApp();
-  };
-
-  // Dispositivos disponíveis - ADICIONADO APLICATIVO TESTE
+  // Dispositivos disponíveis
   const availableDevices = [
     {
-      id: 'apple_health',
-      name: 'Apple Saúde (HealthKit)',
-      type: 'apple_health',
-      description: 'Conecte seu dispositivo Apple Health para validação automática',
-      icon: Apple,
-      emoji: '❤️',
-      color: 'text-red-500',
-      platform: 'iPhone',
-      required: true,
-      nativeOnly: true
-    },
-    {
-      id: 'health_connect',
-      name: 'Health Connect',
-      type: 'health_connect',
-      description: 'Para dispositivos Android compatíveis',
+      id: 'fitbit',
+      name: 'Fitbit',
       icon: Activity,
-      emoji: '📱',
-      color: 'text-green-500',
-      platform: 'Android',
-      required: false,
-      nativeOnly: true
+      color: 'from-teal-400 to-cyan-500',
+      description: 'Rastreie seus treinos e atividades diárias'
     },
     {
       id: 'strava',
       name: 'Strava',
-      type: 'strava',
-      description: 'Conecte sua conta Strava para sincronizar atividades',
-      icon: Activity,
-      emoji: '🏃',
-      color: 'text-orange-500',
-      platform: 'Web/Mobile',
-      required: false,
-      nativeOnly: false
+      icon: Zap,
+      color: 'from-orange-400 to-red-500',
+      description: 'Sincronize suas corridas e pedaladas'
     },
-
-
-    // ====== ADICIONAR FITBIT AQUI ======
-{
-  id: 'fitbit',
-  name: 'Fitbit',
-  type: 'fitbit',
-  description: 'Conecte seu Fitbit para validação automática de atividades',
-  icon: Activity,
-  emoji: '⌚',
-  color: 'text-cyan-500',
-  platform: 'Web/Mobile',
-  required: false,
-  nativeOnly: false
-},
-    // APLICATIVO TESTE CORRIGIDO
     {
-      id: 'teste',
-      name: 'Teste',
-      type: 'teste',
-      description: 'Aplicativo de teste para simular vitórias e derrotas',
-      icon: TestTube,
-      emoji: '🧪',
-      color: 'text-purple-500',
-      platform: 'Web/Mobile',
-      required: false,
-      nativeOnly: false,
-      isMock: true
+      id: 'apple_health',
+      name: 'Apple Health',
+      icon: Heart,
+      color: 'from-pink-400 to-rose-500',
+      description: 'Conecte seus dados do iPhone'
+    },
+    {
+      id: 'google_fit',
+      name: 'Google Fit',
+      icon: Watch,
+      color: 'from-blue-400 to-indigo-500',
+      description: 'Sincronize seus dados do Android'
     }
   ];
 
-  // CORREÇÃO PRINCIPAL: Carregar conexões com melhor tratamento de erros e debug
-  const loadFitnessConnections = async (forceReload = false) => {
+  // Buscar conexões do usuário
+  useEffect(() => {
+    fetchConnections();
+  }, [user]);
+
+  const fetchConnections = async () => {
+    if (!user?.email) {
+      console.log('❌ [DEVICES] Email do usuário não disponível');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
-      setError(null);
-      
-      if (!user?.email) {
-        console.warn('❌ Usuário não autenticado');
-        setFitnessConnections([]);
-        return;
-      }
+      console.log('📡 [DEVICES] Buscando conexões para:', user.email);
 
-      console.log('🔍 [LOAD_CONNECTIONS] Carregando conexões para:', user.email, forceReload ? '(forçado)' : '');
-      
-      // CORREÇÃO: Tentar carregar do backend primeiro COM MELHOR DEBUG
-      let backendConnections = [];
-      let backendSuccess = false;
-      
-      try {
-        const token = localStorage.getItem('token');
-        const url = `http://localhost:5001/api/fitness/connections/${user.email}`;
-        
-        console.log('📡 [LOAD_CONNECTIONS] Fazendo requisição para:', url);
-        
-        const response = await fetch(url, {
+      const response = await fetch(
+        `${API_URL}/api/fitness/connections/${encodeURIComponent(user.email)}`,
+        {
+          method: 'GET',
           headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        console.log('📡 [LOAD_CONNECTIONS] Status da resposta:', response.status);
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log('📡 [LOAD_CONNECTIONS] Dados recebidos do backend:', data);
-          
-          if (data.success && data.connections) {
-            backendConnections = data.connections.filter(conn => conn.is_active);
-            backendSuccess = true;
-            console.log('✅ [LOAD_CONNECTIONS] Conexões ativas do backend:', backendConnections.length);
-            
-            // CORREÇÃO: Garantir que cada conexão tenha um ID único
-            backendConnections = backendConnections.map(conn => ({
-              ...conn,
-              id: conn.id || `${conn.platform}_${conn.user_id || user.id}`,
-              display_name: getDeviceDisplayName(conn.platform)
-            }));
-            
-          } else {
-            console.warn('⚠️ [LOAD_CONNECTIONS] Resposta do backend sem conexões:', data);
-          }
-        } else {
-          const errorText = await response.text();
-          console.warn('⚠️ [LOAD_CONNECTIONS] Resposta não OK:', response.status, errorText);
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include'
         }
-      } catch (backendError) {
-        console.warn('⚠️ [LOAD_CONNECTIONS] Erro no backend:', backendError.message);
-      }
+      );
 
-      // CORREÇÃO: Se backend funcionou, usar dados do backend
-      if (backendSuccess && backendConnections.length > 0) {
-        setFitnessConnections(backendConnections);
-        setLastSync(new Date());
-        saveToLocalStorage(backendConnections);
-        console.log('✅ [LOAD_CONNECTIONS] Usando dados do backend:', backendConnections);
-        return;
-      }
+      const data = await response.json();
+      console.log('📊 [DEVICES] Resposta:', data);
 
-      // Fallback para localStorage apenas se backend não retornou dados
-      console.log('📱 [LOAD_CONNECTIONS] Tentando carregar do localStorage...');
-      const storageKey = `fitness_connections_${user.email}`;
-      const stored = localStorage.getItem(storageKey);
-      
-      if (stored) {
-        try {
-          const parsedData = JSON.parse(stored);
-          const connections = parsedData.connections || parsedData;
-          const activeConnections = connections.filter(conn => conn.is_active);
-          
-          // CORREÇÃO: Garantir que conexões do localStorage tenham IDs
-          const formattedConnections = activeConnections.map(conn => ({
-            ...conn,
-            id: conn.id || `${conn.platform}_${conn.user_id || user.id}`,
-            display_name: getDeviceDisplayName(conn.platform)
-          }));
-          
-          setFitnessConnections(formattedConnections);
-          setLastSync(new Date(parsedData.lastUpdate || Date.now()));
-          console.log('📱 [LOAD_CONNECTIONS] Conexões carregadas do localStorage:', formattedConnections.length);
-        } catch (parseError) {
-          console.error('❌ [LOAD_CONNECTIONS] Erro ao parsear localStorage:', parseError);
-          setFitnessConnections([]);
-        }
+      if (data.success) {
+        setConnections(data.connections || []);
+        console.log('✅ [DEVICES] Conexões carregadas:', data.connections?.length || 0);
       } else {
-        setFitnessConnections([]);
-        console.log('📝 [LOAD_CONNECTIONS] Nenhuma conexão encontrada');
+        console.warn('⚠️ [DEVICES] Sem conexões:', data.error);
+        setConnections([]);
       }
-      
-    } catch (error) {
-      console.error('❌ [LOAD_CONNECTIONS] Erro geral:', error);
+    } catch (err) {
+      console.error('❌ [DEVICES] Erro ao buscar conexões:', err);
       setError('Erro ao carregar dispositivos conectados');
-      setFitnessConnections([]);
+      setConnections([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // DEPOIS (código correto - COM FITBIT):
-const getDeviceDisplayName = (platform) => {
-  const deviceMap = {
-    'teste': 'Teste',
-    'apple_health': 'Apple Saúde',
-    'health_connect': 'Health Connect',
-    'strava': 'Strava',
-    'fitbit': 'Fitbit'  // ← ADICIONAR ESTA LINHA
-  };
-  return deviceMap[platform] || platform;
-};
-
-
-  // CORREÇÃO: Salvar no localStorage com formato consistente
-  const saveToLocalStorage = (connections) => {
+  // Conectar Fitbit
+  const handleConnectFitbit = async () => {
     try {
-      const storageKey = `fitness_connections_${user.email}`;
-      const dataToSave = {
-        connections,
-        lastUpdate: new Date().toISOString(),
-        version: '2.0'
-      };
-      localStorage.setItem(storageKey, JSON.stringify(dataToSave));
-      console.log('💾 [SAVE_STORAGE] Conexões salvas no localStorage:', connections.length);
-    } catch (error) {
-      console.error('❌ [SAVE_STORAGE] Erro ao salvar no localStorage:', error);
-    }
-  };
-
-  // Carregar conexões existentes - CORREÇÃO: Melhor controle de carregamento
-  useEffect(() => {
-    if (user?.email) {
-      console.log('👤 [USEEFFECT] Usuário autenticado, carregando conexões...');
-      loadFitnessConnections();
-    } else {
-      console.log('👤 [USEEFFECT] Usuário não autenticado');
-      setFitnessConnections([]);
-    }
-  }, [user?.email]);
-
-  // Verificar se dispositivo está conectado
-  const isDeviceConnected = (deviceType) => {
-    const connected = fitnessConnections.some(conn => 
-      conn.platform === deviceType && conn.is_active
-    );
-    console.log(`🔍 [IS_CONNECTED] Dispositivo ${deviceType} conectado:`, connected);
-    return connected;
-  };
-
-  // CORREÇÃO PRINCIPAL: Conectar dispositivo com recarregamento forçado
-  const handleConnectDevice = async (device) => {
-    try {
-      setConnecting(device.id);
+      setIsConnecting(true);
       setError(null);
-      setSuccess(null);
-
-      // 1. VERIFICAR LOGIN OBRIGATÓRIO
+      
+      console.log('🔗 [FITBIT] Iniciando conexão para:', user.email);
+      
+      // ✅ VERIFICAR SE user.email EXISTE
       if (!user?.email) {
-        throw new Error('Faça login primeiro para conectar dispositivos');
+        setError('Email do usuário não disponível. Faça login novamente.');
+        return;
       }
-
-      console.log('🔗 [CONNECT] Conectando dispositivo:', device.name);
-
-      // 2. VALIDAÇÃO ESPECÍFICA POR TIPO
-      if (device.type === 'apple_health') {
-        await connectHealthKit(device);
-      } else if (device.type === 'health_connect') {
-        await connectHealthConnect(device);
-        // ====== ADICIONAR CASE FITBIT AQUI ======
-        } else if (device.type === 'fitbit') {
-        await connectFitbit(device);
-      } else if (device.type === 'strava') {
-        await connectStrava(device);
-      } else if (device.type === 'teste') {
-        await connectTestApp(device);
-      }
-
-      // 3. CORREÇÃO PRINCIPAL: RECARREGAR CONEXÕES COM DELAY E FORÇA
-      console.log('🔄 [CONNECT] Recarregando conexões após conexão...');
       
-      // Aguardar um pouco para o backend processar
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // ✅ CONSTRUIR URL COM user_email
+      const url = `${API_URL}/api/fitbit/connect?user_email=${encodeURIComponent(user.email)}`;
       
-      // Forçar recarregamento
-      await loadFitnessConnections(true);
+      console.log('📡 [FITBIT] URL da requisição:', url);
       
-      if (onConnectDevice) {
-        onConnectDevice(device.type);
-      }
-
-    } catch (error) {
-      console.error('❌ [CONNECT] Erro ao conectar dispositivo:', error);
-      setError(error.message || `Erro ao conectar ${device.name}`);
-    } finally {
-      setConnecting(null);
-    }
-  };
-
-  // CORREÇÃO PRINCIPAL: Conectar aplicativo de teste com registro no backend
-  const connectTestApp = async (device) => {
-    try {
-      console.log('🧪 [CONNECT_TEST] Conectando aplicativo de teste...');
-      
-      // 1. VERIFICAR LOGIN OBRIGATÓRIO
-      if (!user?.email) {
-        throw new Error('Faça login primeiro para conectar o aplicativo de teste');
-      }
-
-      // 2. SIMULAR DELAY DE CONEXÃO
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      // 3. CRIAR CONEXÃO MOCK
-      const mockConnection = {
-        user_email: user.email,
-        platform: 'teste',
-        device_id: `teste_${Math.random().toString(36).substr(2, 9)}`,
-        is_active: true,
-        connected_at: new Date().toISOString(),
-        last_sync: new Date().toISOString(),
-        permissions: ['mock_activities', 'mock_challenges'],
-        metadata: {
-          total_activities: 0,
-          total_wins: 0,
-          total_losses: 0,
-          last_activity: null
-        }
-      };
-
-      // 4. CORREÇÃO PRINCIPAL: REGISTRAR NO BACKEND PRIMEIRO
-      let backendConnection = null;
-      try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('http://localhost:5001/api/fitness/connect-test', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(mockConnection)
-        });
-
-        console.log('📡 [CONNECT_TEST] Resposta do backend:', response.status);
-
-        if (response.ok) {
-          const result = await response.json();
-          console.log('📡 [CONNECT_TEST] Resultado do backend:', result);
-          
-          if (result.success) {
-            backendConnection = result.connection;
-            console.log('✅ [CONNECT_TEST] Dispositivo teste registrado no backend:', backendConnection);
-          } else {
-            throw new Error(result.error || 'Falha ao registrar no backend');
-          }
-        } else {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `Erro HTTP ${response.status}`);
-        }
-      } catch (backendError) {
-        console.warn('⚠️ [CONNECT_TEST] Erro no backend:', backendError.message);
-        // Se o backend falhar, usar dados locais mas avisar o usuário
-        backendConnection = { ...mockConnection, id: `local_${Date.now()}` };
-        setError('Dispositivo conectado localmente. Verifique a conexão com o servidor para sincronização completa.');
-      }
-
-      // 5. CORREÇÃO: ATUALIZAR ESTADO IMEDIATAMENTE
-      const connectionToSave = {
-        ...backendConnection,
-        id: backendConnection.id || `teste_${Date.now()}`,
-        display_name: 'Teste',
-        is_active: true
-      };
-      
-      // Atualizar estado local imediatamente
-      const updatedConnections = [...fitnessConnections, connectionToSave];
-      setFitnessConnections(updatedConnections);
-      saveToLocalStorage(updatedConnections);
-      setLastSync(new Date());
-
-      // 6. INICIAR SIMULAÇÃO DE ATIVIDADES
-      startMockActivitySimulation(user.email);
-
-      setSuccess(`Aplicativo de teste conectado com sucesso! Agora você pode simular vitórias e derrotas.`);
-      console.log('✅ [CONNECT_TEST] Aplicativo de teste conectado:', connectionToSave);
-      
-      return connectionToSave;
-
-    } catch (error) {
-      console.error('❌ [CONNECT_TEST] Erro ao conectar aplicativo de teste:', error);
-      throw error;
-    }
-  };
-
-  // Simulação de atividades
-  const startMockActivitySimulation = (userEmail) => {
-    console.log('🎮 [MOCK_SIM] Iniciando simulação para:', userEmail);
-    
-    const intervalId = setInterval(() => {
-      simulateMockActivity(userEmail);
-    }, 45000);
-
-    localStorage.setItem(`mock_simulation_${userEmail}`, intervalId.toString());
-    setTimeout(() => simulateMockActivity(userEmail), 5000);
-  };
-
-  const simulateMockActivity = async (userEmail) => {
-    const activities = [
-      { type: 'corrida', distance: Math.floor(Math.random() * 10) + 1, duration: Math.floor(Math.random() * 60) + 10 },
-      { type: 'caminhada', distance: Math.floor(Math.random() * 5) + 1, duration: Math.floor(Math.random() * 30) + 15 },
-      { type: 'ciclismo', distance: Math.floor(Math.random() * 20) + 5, duration: Math.floor(Math.random() * 90) + 20 }
-    ];
-
-    const randomActivity = activities[Math.floor(Math.random() * activities.length)];
-    const isWin = Math.random() > 0.3;
-
-    const mockData = {
-      user_email: userEmail,
-      platform: 'teste',
-      activity_type: randomActivity.type,
-      distance: randomActivity.distance,
-      duration: randomActivity.duration,
-      calories: Math.floor(randomActivity.duration * 8),
-      timestamp: new Date().toISOString(),
-      result: isWin ? 'win' : 'loss'
-    };
-
-    const resultEmoji = isWin ? '🏆' : '😔';
-    const resultText = isWin ? 'Vitória' : 'Derrota';
-    
-    setSuccess(
-      `${resultEmoji} Atividade simulada: ${randomActivity.type} - ${randomActivity.distance}km em ${randomActivity.duration}min (${resultText})`
-    );
-
-    await sendMockDataToBackend(mockData);
-  };
-
-  const sendMockDataToBackend = async (mockData) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5001/api/fitness/mock-activity', {
-        method: 'POST',
+      const response = await fetch(url, {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(mockData)
+        credentials: 'include'
       });
 
-      if (response.ok) {
-        const result = await response.json();
-        
-        if (result.challenge_validations?.completed_challenges?.length > 0) {
-          const challenge = result.challenge_validations.completed_challenges[0];
-          setTimeout(() => {
-            setSuccess(
-              `🏆 Parabéns! Você completou o "${challenge.challenge_title}" e ganhou R$ ${challenge.prize_amount.toFixed(2)}!`
-            );
-          }, 2000);
-        }
-
-        console.log('✅ [MOCK_BACKEND] Dados enviados:', result);
-        return result;
-      }
-    } catch (error) {
-      console.error('❌ [MOCK_BACKEND] Erro:', error);
-    }
-  };
-
-  const stopMockActivitySimulation = (userEmail) => {
-    const intervalId = localStorage.getItem(`mock_simulation_${userEmail}`);
-    if (intervalId) {
-      clearInterval(parseInt(intervalId));
-      localStorage.removeItem(`mock_simulation_${userEmail}`);
-    }
-  };
-
-  // Conectar outros dispositivos (simplificado)
-  const connectHealthKit = async (device) => {
-    if (!isNativeApp()) {
-      throw new Error('HealthKit disponível apenas no app móvel oficial.');
-    }
-    throw new Error('HealthKit ainda não implementado nesta versão');
-  };
-
-  const connectHealthConnect = async (device) => {
-    if (!isNativeApp()) {
-      throw new Error('Health Connect disponível apenas no app móvel oficial.');
-    }
-    throw new Error('Health Connect ainda não implementado nesta versão');
-  };
-
-  // ====== ADICIONAR FUNÇÃO FITBIT AQUI ======
-const connectFitbit = async (device) => {
-  try {
-    console.log('⌚ [CONNECT_FITBIT] Iniciando conexão com Fitbit...');
-    
-    // 1. Verificar se está no navegador
-    if (isNativeApp()) {
-      throw new Error('Fitbit deve ser conectado através do navegador web');
-    }
-
-    // 2. Verificar Client ID e Secret
-    const fitbitClientId = process.env.REACT_APP_FITBIT_CLIENT_ID;
-    if (!fitbitClientId) {
-      throw new Error('Client ID do Fitbit não configurado. Verifique as variáveis de ambiente.');
-    }
-
-    console.log('🔑 [CONNECT_FITBIT] Client ID encontrado');
-
-    // 3. URLs consistentes para desenvolvimento e produção
-    const isDevelopment = window.location.hostname === 'localhost';
-    const backendUrl = isDevelopment 
-      ? 'http://localhost:5001'
-      : 'https://betfit-backend.onrender.com';
-    
-    const redirectUri = isDevelopment
-      ? 'http://localhost:3000/fitbit/callback'
-      : 'https://betfit-frontend-thwz.onrender.com/fitbit/callback';
-
-    // 4. Solicitar URL de autorização ao backend
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${backendUrl}/api/fitbit/connect?user_email=${user.email}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('Erro ao gerar URL de autorização');
-    }
-
-    const data = await response.json();
-    
-    if (!data.success || !data.authorization_url) {
-      throw new Error('URL de autorização não recebida');
-    }
-
-    console.log('🔗 [CONNECT_FITBIT] URL de autorização recebida');
-
-    // 5. Armazenar dados de conexão pendente
-    const pendingData = {
-      user_email: user.email,
-      started_at: Date.now(),
-      device_type: 'fitbit',
-      backend_url: backendUrl
-    };
-    localStorage.setItem('fitbit_connection_pending', JSON.stringify(pendingData));
-
-    // 6. Redirecionar para autorização (não popup, redirect direto)
-    console.log('🌐 [CONNECT_FITBIT] Redirecionando para autorização...');
-    window.location.href = data.authorization_url;
-
-  } catch (error) {
-    console.error('❌ [CONNECT_FITBIT] Erro:', error);
-    localStorage.removeItem('fitbit_connection_pending');
-    throw error;
-  }
-};
-
-  const connectStrava = async (device) => {
-  try {
-    console.log('🚴 [CONNECT_STRAVA] Iniciando conexão com Strava...');
-    
-    // 1. Verificar se está no navegador
-    if (isNativeApp()) {
-      throw new Error('Strava deve ser conectado através do navegador web');
-    }
-
-    // 2. Verificar Client ID
-    const stravaClientId = process.env.REACT_APP_STRAVA_CLIENT_ID;
-    if (!stravaClientId) {
-      throw new Error('Client ID do Strava não configurado. Verifique as variáveis de ambiente.');
-    }
-
-    console.log('🔑 [CONNECT_STRAVA] Client ID encontrado:', stravaClientId);
-
-    // 3. URLs consistentes para desenvolvimento e produção
-    const isDevelopment = window.location.hostname === 'localhost';
-    const backendUrl = isDevelopment 
-      ? 'http://localhost:5001'
-      : 'https://betfit-backend.onrender.com';
-    
-    const redirectUri = isDevelopment
-      ? 'http://localhost:5001/api/auth/strava/callback'
-      : 'https://betfit-backend.onrender.com/api/auth/strava/callback';
-
-    // 4. State com dados do usuário
-    const state = btoa(JSON.stringify({ 
-      user_email: user.email,
-      timestamp: Date.now(),
-      return_url: window.location.href
-    }));
-
-    // 5. URL de autorização sem encodeURIComponent
-    const stravaAuthUrl = `https://www.strava.com/oauth/authorize?` +
-      `client_id=${stravaClientId}` +
-      `&redirect_uri=${redirectUri}` +
-      `&response_type=code` +
-      `&scope=read,activity:read` +
-      `&state=${state}`;
-
-    console.log('🔗 [CONNECT_STRAVA] URL de autorização:', stravaAuthUrl);
-    console.log('🔗 [CONNECT_STRAVA] Redirect URI:', redirectUri);
-
-    // 6. Armazenar dados de conexão pendente
-    const pendingData = {
-      user_email: user.email,
-      started_at: Date.now(),
-      device_type: 'strava',
-      backend_url: backendUrl
-    };
-    localStorage.setItem('strava_connection_pending', JSON.stringify(pendingData));
-
-    // 7. Abrir popup
-    const popup = window.open(
-      stravaAuthUrl,
-      'strava-auth',
-      'width=600,height=700,scrollbars=yes,resizable=yes'
-    );
-
-    if (!popup) {
-      localStorage.removeItem('strava_connection_pending');
-      throw new Error('Popup foi bloqueado pelo navegador. Permita popups para este site.');
-    }
-
-    console.log('🪟 [CONNECT_STRAVA] Popup aberto, aguardando autorização...');
-
-    // 8. Aguardar resultado do popup
-    const result = await waitForStravaPopupResult(popup, backendUrl);
-    
-    if (result.success) {
-      console.log('✅ [CONNECT_STRAVA] Autorização bem-sucedida!');
+      console.log('📊 [FITBIT] Status da resposta:', response.status);
       
-      // Aguardar processamento no backend
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Recarregar conexões
-      await loadFitnessConnections(true);
-      
-      setSuccess('Strava conectado com sucesso! Suas atividades serão sincronizadas automaticamente.');
-      
-      // Iniciar sincronização
-      startStravaSync(user.email, backendUrl);
-      
-      return result;
-    } else {
-      throw new Error(result.error || 'Falha na autorização do Strava');
-    }
-
-  } catch (error) {
-    console.error('❌ [CONNECT_STRAVA] Erro:', error);
-    localStorage.removeItem('strava_connection_pending');
-    throw error;
-  }
-};
-
-// FUNÇÃO PRINCIPAL QUE ESTAVA FALTANDO
-const waitForStravaPopupResult = (popup, backendUrl) => {
-  return new Promise((resolve, reject) => {
-    let resolved = false;
-
-    // Timeout de 5 minutos
-    const timeout = setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
-        popup.close();
-        reject(new Error('Tempo limite de autorização excedido'));
-      }
-    }, 300000);
-
-    // Escutar mensagens do popup (postMessage do callback)
-    const messageHandler = (event) => {
-      console.log('📨 [STRAVA_POPUP] Mensagem recebida:', event.data);
-      
-      if (event.data && typeof event.data === 'object') {
-        if (event.data.type === 'strava_success') {
-          if (!resolved) {
-            resolved = true;
-            clearTimeout(timeout);
-            window.removeEventListener('message', messageHandler);
-            popup.close();
-            resolve({ success: true, data: event.data });
-          }
-        } else if (event.data.type === 'strava_error') {
-          if (!resolved) {
-            resolved = true;
-            clearTimeout(timeout);
-            window.removeEventListener('message', messageHandler);
-            popup.close();
-            reject(new Error(event.data.error || 'Erro na autorização'));
-          }
-        }
-      }
-    };
-
-    window.addEventListener('message', messageHandler);
-
-    // Verificar se popup foi fechado manualmente
-    const checkClosed = setInterval(() => {
-      if (popup.closed) {
-        clearInterval(checkClosed);
-        
-        if (!resolved) {
-          resolved = true;
-          clearTimeout(timeout);
-          window.removeEventListener('message', messageHandler);
-          
-          console.log('🪟 [STRAVA_POPUP] Popup fechado, verificando resultado...');
-          
-          // Dar tempo para o callback ser processado
-          setTimeout(async () => {
-            try {
-              await checkStravaConnectionResult(backendUrl, resolve, reject);
-            } catch (error) {
-              reject(new Error('Autorização cancelada ou falhou'));
-            }
-          }, 2000);
-        }
-      }
-    }, 1000);
-  });
-};
-
-// Função para verificar resultado da conexão
-const checkStravaConnectionResult = async (backendUrl, resolve, reject) => {
-  try {
-    const pendingData = localStorage.getItem('strava_connection_pending');
-    if (!pendingData) {
-      reject(new Error('Dados de conexão não encontrados'));
-      return;
-    }
-
-    const pending = JSON.parse(pendingData);
-    console.log('🔍 [CHECK_STRAVA] Verificando conexão para:', pending.user_email);
-    
-    // Verificar se conexão foi criada no backend
-    const token = localStorage.getItem('token');
-    const checkUrl = `${backendUrl}/api/fitness/connections/${pending.user_email}`;
-    
-    const response = await fetch(checkUrl, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (response.ok) {
       const data = await response.json();
-      console.log('📡 [CHECK_STRAVA] Resposta:', data);
       
-      // Procurar conexão Strava recente (últimos 2 minutos)
-      const recentConnection = data.connections?.find(conn => 
-        conn.platform === 'strava' && 
-        conn.is_active &&
-        (Date.now() - new Date(conn.connected_at || conn.created_at).getTime()) < 120000
-      );
-
-      if (recentConnection) {
-        console.log('✅ [CHECK_STRAVA] Conexão encontrada!');
-        localStorage.removeItem('strava_connection_pending');
-        resolve({ success: true, connection: recentConnection });
+      console.log('📊 [FITBIT] Dados recebidos:', data);
+      
+      if (data.success && data.authorization_url) {
+        console.log('✅ [FITBIT] Redirecionando para autorização...');
+        console.log('🔗 [FITBIT] URL:', data.authorization_url);
+        
+        // ✅ REDIRECIONAR PARA AUTORIZAÇÃO DO FITBIT
+        window.location.href = data.authorization_url;
       } else {
-        console.log('⚠️ [CHECK_STRAVA] Nenhuma conexão recente encontrada');
-        reject(new Error('Falha ao conectar. Tente novamente.'));
+        throw new Error(data.error || 'Erro ao gerar URL de autorização');
       }
-    } else {
-      console.error('❌ [CHECK_STRAVA] Erro na resposta:', response.status);
-      reject(new Error('Erro ao verificar conexão no servidor'));
-    }
-
-  } catch (error) {
-    console.error('❌ [CHECK_STRAVA] Erro:', error);
-    reject(new Error('Erro ao verificar conexão'));
-  }
-};
-
-// Função para iniciar sincronização periódica
-const startStravaSync = (userEmail, backendUrl) => {
-  console.log('🔄 [STRAVA_SYNC] Iniciando sincronização para:', userEmail);
-  
-  // Parar sincronização anterior se existir
-  stopStravaSync(userEmail);
-  
-  // Sincronizar após 3 segundos
-  setTimeout(() => {
-    syncStravaActivities(userEmail, backendUrl);
-  }, 3000);
-  
-  // Agendar sincronizações regulares (10 minutos)
-  const intervalId = setInterval(() => {
-    syncStravaActivities(userEmail, backendUrl);
-  }, 600000); // 10 minutos
-
-  localStorage.setItem(`strava_sync_${userEmail}`, intervalId.toString());
-};
-
-// Função para sincronizar atividades do Strava
-const syncStravaActivities = async (userEmail, backendUrl) => {
-  try {
-    console.log('⚡ [STRAVA_SYNC] Sincronizando atividades...');
-
-    // Usar backendUrl se fornecido, senão detectar ambiente
-    const isDevelopment = window.location.hostname === 'localhost';
-    const syncBackendUrl = backendUrl || (isDevelopment 
-      ? 'http://localhost:5001' 
-      : 'https://betfit-backend.onrender.com');
-
-    const token = localStorage.getItem('token');
-    const response = await fetch(`${syncBackendUrl}/api/fitness/strava/sync`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        user_email: userEmail
-      })
-    });
-
-    if (response.ok) {
-      const result = await response.json();
-      console.log('✅ [STRAVA_SYNC] Sincronização concluída:', result);
-      
-      // Verificar desafios completados
-      if (result.challenge_completions && result.challenge_completions.length > 0) {
-        result.challenge_completions.forEach((completion, index) => {
-          setTimeout(() => {
-            setSuccess(
-              `🏆 Parabéns! Você completou "${completion.challenge_title}" e ganhou R$ ${completion.prize_amount.toFixed(2)}!`
-            );
-          }, (index + 1) * 2000); // Mostrar uma por vez com delay
-        });
-      }
-      
-      // Atualizar conexões se processou atividades
-      if (result.activities_processed > 0) {
-        setTimeout(() => loadFitnessConnections(true), 1000);
-      }
-      
-      return result;
-    } else {
-      const errorText = await response.text();
-      console.warn('⚠️ [STRAVA_SYNC] Falha:', response.status, errorText);
-    }
-
-  } catch (error) {
-    console.warn('⚠️ [STRAVA_SYNC] Erro:', error.message);
-  }
-};
-  
-// Parar sincronização do Strava
-// Verifique se as funções anteriores estão fechadas corretamente.
-// Aqui está o final correto do arquivo ProfileDevices:
-
-// Parar sincronização do Strava
-const stopStravaSync = (userEmail) => {
-  const intervalId = localStorage.getItem(`strava_sync_${userEmail}`);
-  if (intervalId) {
-    clearInterval(parseInt(intervalId));
-    localStorage.removeItem(`strava_sync_${userEmail}`);
-    console.log('⏹️ [STRAVA_SYNC] Sincronização parada para:', userEmail);
-  }
-}; // <- Certifique-se que esta chave está fechada
-
-// Cleanup no useEffect
-useEffect(() => {
-  return () => {
-    if (user?.email) {
-      stopMockActivitySimulation(user.email);
-      stopStravaSync(user.email);
-      // ====== ADICIONAR AQUI ======
-      // Parar sincronização do Fitbit também
-      const fitbitIntervalId = localStorage.getItem(`fitbit_sync_${user.email}`);
-      if (fitbitIntervalId) {
-        clearInterval(parseInt(fitbitIntervalId));
-        localStorage.removeItem(`fitbit_sync_${user.email}`);
-      }
+    } catch (err) {
+      console.error('❌ [FITBIT] Erro:', err);
+      setError(err.message || 'Erro ao conectar Fitbit');
+    } finally {
+      setIsConnecting(false);
     }
   };
-}, [user?.email]); // <- Certifique-se que esta chave está fechada
 
-
-// ====== ADICIONAR NOVO USEEFFECT AQUI ======
-// Verificar callback do Fitbit
-useEffect(() => {
-  const checkFitbitCallback = () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const fitbitConnected = urlParams.get('fitbit_connected');
-    
-    if (fitbitConnected === 'true') {
-      console.log('✅ [FITBIT_CALLBACK] Fitbit conectado com sucesso!');
-      setSuccess('Fitbit conectado com sucesso! Suas atividades serão sincronizadas automaticamente.');
-      
-      // Limpar URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-      
-      // Recarregar conexões após 1 segundo
-      setTimeout(() => {
-        loadFitnessConnections(true);
-      }, 1000);
-      
-      localStorage.removeItem('fitbit_connection_pending');
-    } else if (fitbitConnected === 'false') {
-      const error = urlParams.get('error');
-      console.error('❌ [FITBIT_CALLBACK] Erro:', error);
-      setError(error || 'Erro ao conectar Fitbit');
-      
-      // Limpar URL
-      window.history.replaceState({}, document.title, window.location.pathname);
-      
-      localStorage.removeItem('fitbit_connection_pending');
-    }
-  };
-  
-  checkFitbitCallback();
-}, []);
-
-// Desconectar dispositivo
-const handleDisconnectDevice = async (device) => {
-  try {
-    const confirmed = window.confirm(
-      `Tem certeza que deseja desconectar ${device.name}?`
-    );
-
-    if (!confirmed) return;
-
-    setConnecting(device.id);
-
-    if (device.type === 'teste') {
-      stopMockActivitySimulation(user.email);
-    }
-
-    // Desconectar no backend
+  // Conectar Strava
+  const handleConnectStrava = async () => {
     try {
-      const token = localStorage.getItem('token');
-      await fetch('http://localhost:5001/api/fitness/disconnect', {
+      setIsConnecting(true);
+      setError(null);
+      
+      console.log('🔗 [STRAVA] Iniciando conexão para:', user.email);
+      
+      if (!user?.email) {
+        setError('Email do usuário não disponível');
+        return;
+      }
+      
+      const url = `${API_URL}/api/strava/connect?user_email=${encodeURIComponent(user.email)}`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.success && data.authorization_url) {
+        window.location.href = data.authorization_url;
+      } else {
+        throw new Error(data.error || 'Erro ao conectar Strava');
+      }
+    } catch (err) {
+      console.error('❌ [STRAVA] Erro:', err);
+      setError(err.message);
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  // Desconectar dispositivo
+  const handleDisconnect = async (platform) => {
+    try {
+      console.log('🔌 [DEVICES] Desconectando:', platform);
+      
+      const response = await fetch(`${API_URL}/api/fitness/disconnect`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
         },
+        credentials: 'include',
         body: JSON.stringify({
           user_email: user.email,
-          platform: device.type
+          platform: platform
         })
       });
-    } catch (error) {
-      console.warn('Erro ao desconectar no backend:', error);
+
+      const data = await response.json();
+      
+      if (data.success) {
+        console.log('✅ [DEVICES] Dispositivo desconectado');
+        setSuccessMessage(`${platform} desconectado com sucesso!`);
+        fetchConnections(); // Recarregar conexões
+        
+        // Limpar mensagem após 3s
+        setTimeout(() => setSuccessMessage(null), 3000);
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (err) {
+      console.error('❌ [DEVICES] Erro ao desconectar:', err);
+      setError(err.message);
     }
-
-    // Remover localmente
-    const updatedConnections = fitnessConnections.filter(conn => conn.platform !== device.type);
-    setFitnessConnections(updatedConnections);
-    saveToLocalStorage(updatedConnections);
-    setLastSync(new Date());
-    
-    setSuccess(`${device.name} desconectado com sucesso.`);
-    
-    setTimeout(() => loadFitnessConnections(true), 500);
-    
-    if (onDisconnectDevice) {
-      onDisconnectDevice(device.id);
-    }
-
-  } catch (error) {
-    console.error('Erro ao desconectar:', error);
-    setError(error.message || `Erro ao desconectar ${device.name}`);
-  } finally {
-    setConnecting(null);
-  }
-};
-
-  // Encontrar dispositivo por conexão
-  const findDeviceByConnection = (connection) => {
-    return availableDevices.find(device => device.type === connection.platform);
   };
 
-  // Limpar mensagens
-  useEffect(() => {
-    if (error || success) {
-      const timer = setTimeout(() => {
-        setError(null);
-        setSuccess(null);
-      }, 5000);
-      return () => clearTimeout(timer);
+  // Verificar se dispositivo está conectado
+  const isDeviceConnected = (deviceId) => {
+    return connections.some(conn => 
+      conn.platform === deviceId && conn.is_active
+    );
+  };
+
+  // Handler para conexão baseado no dispositivo
+  const handleConnect = (deviceId) => {
+    switch(deviceId) {
+      case 'fitbit':
+        handleConnectFitbit();
+        break;
+      case 'strava':
+        handleConnectStrava();
+        break;
+      case 'apple_health':
+        setError('Apple Health em breve! Use Fitbit ou Strava por enquanto.');
+        break;
+      case 'google_fit':
+        setError('Google Fit em breve! Use Fitbit ou Strava por enquanto.');
+        break;
+      default:
+        setError('Dispositivo não suportado');
     }
-  }, [error, success]);
-
-  // Cleanup
-  useEffect(() => {
-    return () => {
-      if (user?.email) {
-        stopMockActivitySimulation(user.email);
-      }
-    };
-  }, [user?.email]);
-
-  const activeConnections = fitnessConnections.filter(conn => conn.is_active);
-
-  console.log('🔍 [RENDER] Estado atual:', {
-    fitnessConnections: fitnessConnections.length,
-    activeConnections: activeConnections.length,
-    isLoading,
-    user: user?.email
-  });
+  };
 
   return (
     <div className="space-y-6">
-      {/* Success Alert */}
-      {success && (
-        <Alert className="border-green-200 bg-green-50 dark:bg-green-950">
-          <CheckCircle className="h-4 w-4 text-green-600" />
-          <AlertDescription className="text-green-800 dark:text-green-200">
-            {success}
-          </AlertDescription>
-        </Alert>
-      )}
+      {/* Header */}
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900">Dispositivos Conectados</h2>
+        <p className="text-gray-600 mt-1">
+          Conecte seus dispositivos fitness para participar de desafios
+        </p>
+      </div>
 
-      {/* Error Alert */}
+      {/* Mensagens */}
       {error && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="whitespace-pre-line">{error}</AlertDescription>
-        </Alert>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <div className="flex items-center gap-2">
+            <XCircle className="w-5 h-5 text-red-500" />
+            <p className="text-red-800">{error}</p>
+          </div>
+          <button 
+            onClick={() => setError(null)}
+            className="mt-2 text-sm text-red-600 hover:text-red-800"
+          >
+            Fechar
+          </button>
+        </div>
       )}
 
-      {/* Dispositivos Conectados */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Dispositivos Conectados</span>
-            <div className="flex items-center space-x-2">
-              <Badge variant="secondary">
-                {activeConnections.length} ativos
-              </Badge>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => loadFitnessConnections(true)}
-                disabled={isLoading}
-                className="flex items-center space-x-1"
-              >
-                <RefreshCw className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} />
-                <span>Atualizar</span>
-              </Button>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="flex justify-center items-center p-8">
-              <Loader2 className="w-8 h-8 animate-spin text-primary" />
-              <span className="ml-3 text-muted-foreground">Carregando dispositivos...</span>
-            </div>
-          ) : activeConnections.length === 0 ? (
-            <div className="text-center p-8 border-2 border-dashed border-border rounded-lg">
-              <Smartphone className="mx-auto h-12 w-12 text-muted-foreground" />
-              <h3 className="mt-2 text-sm font-semibold text-foreground">Nenhum dispositivo conectado</h3>
-              <p className="mt-1 text-sm text-muted-foreground">Conecte seus dispositivos para validação automática de atividades.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {activeConnections.map(connection => {
-                const device = findDeviceByConnection(connection);
-                if (!device) return null;
+      {successMessage && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="w-5 h-5 text-green-500" />
+            <p className="text-green-800">{successMessage}</p>
+          </div>
+        </div>
+      )}
 
-                const IconComponent = device.icon;
-                
-                return (
-                  <div key={connection.id} className="flex items-center justify-between p-4 bg-secondary rounded-lg">
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        <span className="text-3xl">{device.emoji}</span>
-                        <IconComponent className={`w-6 h-6 ${device.color}`} />
+      {/* Loading State */}
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader className="w-8 h-8 animate-spin text-cyan-500" />
+        </div>
+      ) : (
+        /* Grid de Dispositivos */
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {availableDevices.map((device) => {
+            const Icon = device.icon;
+            const isConnected = isDeviceConnected(device.id);
+            
+            return (
+              <div
+                key={device.id}
+                className={`
+                  relative overflow-hidden rounded-xl border-2 transition-all
+                  ${isConnected 
+                    ? 'border-green-400 bg-green-50' 
+                    : 'border-gray-200 bg-white hover:border-cyan-400'
+                  }
+                `}
+              >
+                {/* Gradient Background */}
+                <div className={`
+                  absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${device.color}
+                  opacity-10 rounded-full -mr-16 -mt-16
+                `} />
+
+                <div className="relative p-6">
+                  {/* Header do Card */}
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`
+                        p-3 rounded-xl bg-gradient-to-br ${device.color}
+                      `}>
+                        <Icon className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-foreground">{device.name}</h3>
-                          <Badge variant="default" className="bg-green-100 text-green-800 text-xs">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            Conectado
-                          </Badge>
-                          {device.isMock && (
-                            <Badge variant="outline" className="text-xs text-purple-600">
-                              Mock
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="text-sm text-muted-foreground">{device.platform}</p>
-                        {connection.last_sync && (
-                          <div className="flex items-center space-x-1 text-xs text-muted-foreground mt-1">
-                            <Clock className="w-3 h-3" />
-                            <span>
-                              Última sincronização: {new Date(connection.last_sync).toLocaleString('pt-BR')}
-                            </span>
-                          </div>
-                        )}
+                        <h3 className="font-semibold text-gray-900">{device.name}</h3>
+                        <p className="text-sm text-gray-500">{device.description}</p>
                       </div>
                     </div>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => handleDisconnectDevice(device)}
-                      disabled={connecting === device.id}
-                    >
-                      {connecting === device.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        'Desconectar'
-                      )}
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
-      {/* Dispositivos Disponíveis */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Plus className="w-5 h-5 text-primary" />
-            <span>Dispositivos Disponíveis</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {availableDevices.map(device => {
-              const isConnected = isDeviceConnected(device.type);
-              const IconComponent = device.icon;
-              const requiresNativeApp = device.nativeOnly && isWebBrowser();
-              
-              if (isConnected) return null;
-              
-              return (
-                <div key={device.id} className="flex items-center justify-between p-4 bg-secondary rounded-lg">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <span className="text-3xl">{device.emoji}</span>
-                      <div className="p-2 bg-muted rounded-lg">
-                        <IconComponent className={`w-6 h-6 ${device.color}`} />
+                    {/* Status Badge */}
+                    {isConnected && (
+                      <div className="flex items-center gap-1 bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-medium">
+                        <CheckCircle className="w-4 h-4" />
+                        Conectado
                       </div>
-                    </div>
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <h4 className="font-semibold text-foreground">{device.name}</h4>
-                        {device.required && (
-                          <Badge variant="outline" className="text-xs">
-                            Recomendado
-                          </Badge>
-                        )}
-                        {device.isMock && (
-                          <Badge variant="outline" className="text-xs text-purple-600">
-                            Mock
-                          </Badge>
-                        )}
-                        {requiresNativeApp && (
-                          <Badge variant="outline" className="text-xs text-orange-600">
-                            App Móvel
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-muted-foreground">{device.description}</p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Plataforma: {device.platform}
-                      </p>
-                    </div>
+                    )}
                   </div>
-                  {requiresNativeApp ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled
-                      className="flex items-center space-x-2"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      <span>App Móvel</span>
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={() => handleConnectDevice(device)}
-                      disabled={connecting === device.id}
-                      size="sm"
-                      className="flex items-center space-x-2"
-                    >
-                      {connecting === device.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Plus className="w-4 h-4" />
-                      )}
-                      <span>
-                        {connecting === device.id ? 'Conectando...' : 'Conectar'}
+
+                  {/* Botão de Ação */}
+                  <button
+                    onClick={() => isConnected ? handleDisconnect(device.id) : handleConnect(device.id)}
+                    disabled={isConnecting}
+                    className={`
+                      w-full py-3 rounded-lg font-medium transition-all
+                      ${isConnected
+                        ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        : `bg-gradient-to-r ${device.color} text-white hover:shadow-lg`
+                      }
+                      ${isConnecting ? 'opacity-50 cursor-not-allowed' : ''}
+                    `}
+                  >
+                    {isConnecting ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader className="w-5 h-5 animate-spin" />
+                        Conectando...
                       </span>
-                    </Button>
-                  )}
+                    ) : isConnected ? (
+                      'Desconectar'
+                    ) : (
+                      'Conectar'
+                    )}
+                  </button>
                 </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-      {/* Status da Sincronização */}
-      {lastSync && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <div className="flex items-center space-x-2">
-                <Clock className="w-4 h-4" />
-                <span>Última atualização: {lastSync.toLocaleString('pt-BR')}</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span>Sistema ativo</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Informações Adicionais */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <h4 className="font-semibold text-blue-900 mb-2">Por que conectar dispositivos?</h4>
+        <ul className="space-y-1 text-sm text-blue-800">
+          <li className="flex items-center gap-2">
+            <CheckCircle className="w-4 h-4" />
+            Validação automática de desafios completados
+          </li>
+          <li className="flex items-center gap-2">
+            <CheckCircle className="w-4 h-4" />
+            Prêmios liberados instantaneamente
+          </li>
+          <li className="flex items-center gap-2">
+            <CheckCircle className="w-4 h-4" />
+            Acompanhamento em tempo real do progresso
+          </li>
+        </ul>
+      </div>
+
+      {/* Debug Info (apenas em desenvolvimento) */}
+      {import.meta.env.DEV && (
+        <div className="bg-gray-100 rounded-lg p-4 text-xs">
+          <p className="font-mono">API URL: {API_URL}</p>
+          <p className="font-mono">User Email: {user?.email || 'N/A'}</p>
+          <p className="font-mono">Conexões: {connections.length}</p>
+        </div>
       )}
     </div>
   );
