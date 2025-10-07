@@ -685,7 +685,6 @@ def check_challenge_completion(session, user_id, fitness_data):
     return completions
 
 # ✅ CORRETO
-@app.route('/api/fitness/connections/<user_email>', methods=['GET'])
 def get_fitness_connections(user_email):
     """Retorna conexões fitness do usuário"""
     session_db = SessionLocal()
@@ -2982,49 +2981,6 @@ def get_fitness_stats(user_email):
 
 # ==================== FITNESS ENDPOINTS ORIGINAIS ====================
 
-@app.route('/api/fitness/connections/<user_email>', methods=['GET'])
-def get_fitness_connections(user_email):
-    """Retorna todas as conexões fitness do usuário"""
-    session_db = SessionLocal()
-    try:
-        print(f"📡 [FITNESS_CONNECTIONS] Buscando conexões para: {user_email}")
-        
-        user = session_db.query(User).filter_by(email=user_email).first()
-        if not user:
-            return jsonify({'success': False, 'error': 'Usuário não encontrado'}), 404
-        
-        connections = []
-        
-        # ✅ BUSCAR CONEXÕES FITBIT
-        fitbit_user = session_db.query(FitbitUser).filter_by(user_id=user.id).first()
-        if fitbit_user:
-            connections.append({
-                'id': fitbit_user.id,
-                'platform': 'fitbit',
-                'user_id': user.id,
-                'device_id': fitbit_user.fitbit_user_id,
-                'is_active': True,
-                'connected_at': fitbit_user.created_at.isoformat() if fitbit_user.created_at else None,
-                'last_sync': None  # Você pode adicionar lógica de última sincronização
-            })
-        
-        # Buscar outras conexões (Strava, etc)
-        # ... código para outras plataformas ...
-        
-        print(f"✅ [FITNESS_CONNECTIONS] {len(connections)} conexões encontradas")
-        
-        return jsonify({
-            'success': True,
-            'connections': connections
-        })
-        
-    except Exception as e:
-        print(f"❌ [FITNESS_CONNECTIONS] Erro: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        session_db.close()
 
 @app.route('/api/fitness/connect', methods=['POST'])
 def connect_fitness_app():
