@@ -6288,6 +6288,313 @@ print("   - PUT /api/admin/payments/settings/<method>")
 print("💳 Métodos suportados: PIX, MercadoPago, Stripe, PayPal")
 print("🔒 Configurações salvas no banco SQLite com segurança")
 
+
+
+
+# ==================== ROTAS FITBIT ====================
+
+# Importar modelos Fitbit
+from models import FitbitUser, FitbitActivity, FitbitSubscription
+
+# Configurações Fitbit
+FITBIT_CLIENT_ID = os.getenv('FITBIT_CLIENT_ID', '23TG6L')
+FITBIT_CLIENT_SECRET = os.getenv('FITBIT_CLIENT_SECRET', '865176f8088f0d18023a42586addbae8')
+FITBIT_REDIRECT_URI = os.getenv('FITBIT_REDIRECT_URI', 'https://betfit-frontend-thwz.onrender.com/fitbit/callback')
+FITBIT_WEBHOOK_VERIFY_CODE = os.getenv('FITBIT_WEBHOOK_VERIFY_CODE', 'betfit_secret_2025')
+
+@app.route('/api/fitbit/connect', methods=['GET'])
+def fitbit_connect():
+    """Gera URL de autorização Fitbit"""
+    try:
+        user_email = request.args.get('user_email')
+        if not user_email:
+            return jsonify({'error': 'user_email é obrigatório'}), 400
+        
+        # Codificar email no state
+        state = base64.b64encode(user_email.encode()).decode()
+        
+        auth_url = (
+            f"https://www.fitbit.com/oauth2/authorize?"
+            f"response_type=code&"
+            f"client_id={FITBIT_CLIENT_ID}&"
+            f"redirect_uri={FITBIT_REDIRECT_URI}&"
+            f"scope=activity%20heartrate%20location%20nutrition%20profile%20settings%20sleep%20social%20weight&"
+            f"state={state}"
+        )
+        
+        print(f"🔗 [FITBIT] URL de autorização gerada para: {user_email}")
+        return jsonify({
+            'success': True,
+            'authorization_url': auth_url
+        })
+        
+    except Exception as e:
+        print(f"❌ [FITBIT] Erro ao gerar URL: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/fitbit/callback', methods=['GET'])
+def fitbit_callback():
+    """Processa callback OAuth do Fitbit"""
+    session = SessionLocal()
+    try:
+        code = request.args.get('code')
+        state = request.args.get('state')
+        
+        if not code:
+            return jsonify({'error': 'Código não fornecido'}), 400
+        
+        # Decodificar email
+        user_email = base64.b64decode(state).decode()
+        print(f"🔄 [FITBIT] Processando callback para: {user_email}")
+        
+        # Trocar código por tokens
+        token_url = 'https://api.fitbit.com/oauth2/token'
+        auth_header = requests.auth.HTTPBasicAuth(FITBIT_CLIENT_ID, FITBIT_CLIENT_SECRET)
+        
+        data = {
+            'client_id': FITBIT_CLIENT_ID,
+            'grant_type': 'authorization_code',
+            'redirect_uri': FITBIT_REDIRECT_URI,
+            'code': code
+        }
+        
+        response = requests.post(token_url, auth=auth_header, data=data)
+        
+        if response.status_code != 200:
+            print(f"❌ [FITBIT] Erro ao trocar código: {response.text}")
+            return jsonify({'error': 'Falha ao obter tokens'}), 400
+        
+        token_data = response.json()
+        
+        # Buscar usuário
+        user = session.query(User).filter_by(email=user_email).first()
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+        
+        # Criar ou atualizar FitbitUser
+        fitbit_user = session.query(FitbitUser).filter_by(user_id=user.id).first()
+        
+        if fitbit_user:
+            fitbit_user.access_token = token_data['access_token']
+            fitbit_user.refresh_token = token_data['refresh_token']
+            fitbit_user.token_expires_at = datetime.utcnow() + timedelta(seconds=token_data['expires_in'])
+            fitbit_user.updated_at = datetime.utcnow()
+            print(f"✅ [FITBIT] Tokens atualizados para: {user_email}")
+        else:
+            fitbit_user = FitbitUser(
+                id=str(uuid.uuid4()),
+                user_id=user.id,
+                fitbit_user_id=token_data['user_id'],
+                access_token=token_data['access_token'],
+                refresh_token=token_data['refresh_token'],
+                token_expires_at=datetime.utcnow() + timedelta(seconds=token_data['expires_in'])
+            )
+            session.add(fitbit_user)
+            print(f"✅ [FITBIT] Nova conexão criada para: {user_email}")
+        
+        session.commit()
+        
+        # Criar subscription webhook
+        create_fitbit_subscription(fitbit_user, session)
+        
+        # Redirecionar para frontend
+        return redirect('https://betfit-frontend-thwz.onrender.com/dashboard?fitbit_connected=true')
+        
+    except Exception as e:
+        session.rollback()
+        print(f"❌ [FITBIT] Erro no callback: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+@app.route('/api/fitbit/webhook', methods=['GET', 'POST'])
+def fitbit_webhook():
+    """Webhook Fitbit - Recebe notificações em tempo real"""
+    
+    if request.method == 'GET':
+        # Verificação do endpoint pelo Fitbit
+        verify = request.args.get('verify')
+        print(f"🔍 [FITBIT] Verificação do webhook: {verify}")
+        
+        if verify == FITBIT_WEBHOOK_VERIFY_CODE:
+            print("✅ [FITBIT] Webhook verificado com sucesso")
+            return '', 204
+        
+        print("❌ [FITBIT] Código de verificação inválido")
+        return '', 404
+    
+    elif request.method == 'POST':
+        session_db = SessionLocal()
+        try:
+            # Verificar assinatura
+            signature = request.headers.get('X-Fitbit-Signature')
+            body = request.get_data()
+            
+            expected_signature = hmac.new(
+                FITBIT_CLIENT_SECRET.encode('utf-8'),
+                body,
+                hashlib.sha1
+            ).hexdigest()
+            
+            if signature != expected_signature:
+                print("❌ [FITBIT] Assinatura inválida")
+                return jsonify({'error': 'Invalid signature'}), 401
+            
+            notifications = request.json
+            print(f"📬 [FITBIT] {len(notifications)} notificações recebidas")
+            
+            for notification in notifications:
+                owner_id = notification['ownerId']
+                collection_type = notification['collectionType']
+                date = notification['date']
+                
+                print(f"🔔 [FITBIT] Notificação: {owner_id} - {collection_type} - {date}")
+                
+                # Buscar usuário Fitbit
+                fitbit_user = session_db.query(FitbitUser).filter_by(
+                    fitbit_user_id=owner_id
+                ).first()
+                
+                if not fitbit_user:
+                    print(f"⚠️ [FITBIT] Usuário Fitbit não encontrado: {owner_id}")
+                    continue
+                
+                # Processar atividades
+                if collection_type == 'activities':
+                    fetch_and_save_fitbit_activities(fitbit_user, date, session_db)
+                    
+                    # Verificar desafios
+                    check_fitbit_challenges(session_db, fitbit_user.user_id)
+            
+            return '', 204
+            
+        except Exception as e:
+            print(f"❌ [FITBIT] Erro no webhook: {e}")
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': str(e)}), 500
+        finally:
+            session_db.close()
+
+# Funções auxiliares Fitbit
+def create_fitbit_subscription(fitbit_user, session_db):
+    """Cria subscription para receber webhooks"""
+    try:
+        url = f'https://api.fitbit.com/1/user/-/activities/apiSubscriptions/{fitbit_user.fitbit_user_id}.json'
+        headers = {'Authorization': f'Bearer {fitbit_user.access_token}'}
+        
+        response = requests.post(url, headers=headers)
+        
+        if response.status_code in [200, 201, 409]:  # 409 = já existe
+            existing = session_db.query(FitbitSubscription).filter_by(
+                fitbit_user_id=fitbit_user.id,
+                collection_type='activities'
+            ).first()
+            
+            if not existing:
+                subscription = FitbitSubscription(
+                    id=str(uuid.uuid4()),
+                    fitbit_user_id=fitbit_user.id,
+                    subscription_id=fitbit_user.fitbit_user_id,
+                    collection_type='activities'
+                )
+                session_db.add(subscription)
+                session_db.commit()
+                print(f"✅ [FITBIT] Subscription criada para: {fitbit_user.fitbit_user_id}")
+            
+    except Exception as e:
+        print(f"❌ [FITBIT] Erro ao criar subscription: {e}")
+
+def fetch_and_save_fitbit_activities(fitbit_user, date, session_db):
+    """Busca atividades do dia no Fitbit"""
+    try:
+        url = f'https://api.fitbit.com/1/user/-/activities/date/{date}.json'
+        headers = {'Authorization': f'Bearer {fitbit_user.access_token}'}
+        
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code != 200:
+            print(f"❌ [FITBIT] Erro ao buscar atividades: {response.status_code}")
+            return
+        
+        data = response.json()
+        
+        for activity in data.get('activities', []):
+            existing = session_db.query(FitbitActivity).filter_by(
+                activity_id=str(activity['logId'])
+            ).first()
+            
+            if not existing:
+                new_activity = FitbitActivity(
+                    id=str(uuid.uuid4()),
+                    fitbit_user_id=fitbit_user.id,
+                    activity_id=str(activity['logId']),
+                    activity_type=activity.get('activityName'),
+                    start_time=datetime.strptime(
+                        f"{date} {activity['startTime']}", 
+                        '%Y-%m-%d %H:%M:%S'
+                    ),
+                    duration=activity.get('duration'),
+                    distance=activity.get('distance', 0),
+                    calories=activity.get('calories', 0),
+                    steps=activity.get('steps', 0),
+                    raw_data=json.dumps(activity)
+                )
+                session_db.add(new_activity)
+                print(f"✅ [FITBIT] Atividade salva: {activity.get('activityName')}")
+        
+        session_db.commit()
+        
+    except Exception as e:
+        print(f"❌ [FITBIT] Erro ao buscar/salvar atividades: {e}")
+
+def check_fitbit_challenges(session_db, user_id):
+    """Verifica se atividades completaram desafios"""
+    try:
+        # Reutilizar lógica existente de check_challenge_completion_webhook
+        participations = session_db.query(ChallengeParticipation).filter_by(
+            user_id=user_id,
+            status='active'
+        ).all()
+        
+        print(f"🎯 [FITBIT] Verificando {len(participations)} desafios ativos")
+        
+        # Aqui você integra com sua lógica existente
+        
+    except Exception as e:
+        print(f"❌ [FITBIT] Erro ao verificar desafios: {e}")
+
+@app.route('/api/fitbit/status', methods=['GET'])
+def fitbit_status():
+    """Verifica status da conexão Fitbit"""
+    session_db = SessionLocal()
+    try:
+        user_email = request.args.get('user_email')
+        if not user_email:
+            return jsonify({'error': 'user_email obrigatório'}), 400
+        
+        user = session_db.query(User).filter_by(email=user_email).first()
+        if not user:
+            return jsonify({'connected': False}), 200
+        
+        fitbit_user = session_db.query(FitbitUser).filter_by(user_id=user.id).first()
+        
+        if fitbit_user:
+            return jsonify({
+                'connected': True,
+                'fitbit_user_id': fitbit_user.fitbit_user_id,
+                'created_at': fitbit_user.created_at.isoformat()
+            })
+        else:
+            return jsonify({'connected': False})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session_db.close()
+
 # ==================== MAIN ====================
 
 if __name__ == '__main__':
