@@ -2845,31 +2845,48 @@ def get_fitness_stats(user_email):
 # ==================== FITNESS ENDPOINTS ORIGINAIS ====================
 
 @app.route('/api/fitness/connections/<user_email>', methods=['GET'])
-def get_user_fitness_connections(user_email):
-    """
-    Busca as conexões de fitness de um usuário. O frontend usa isso para
-    verificar se o 'Apple Saúde' já está conectado.
-    """
-    session = SessionLocal()
+def get_fitness_connections(user_email):
+    """Retorna todas as conexões fitness do usuário"""
+    session_db = SessionLocal()
     try:
-        print(f"🔗 [FITNESS] Buscando conexões para: {user_email}")
-        user = session.query(User).filter_by(email=user_email).first()
+        print(f"📡 [FITNESS_CONNECTIONS] Buscando conexões para: {user_email}")
+        
+        user = session_db.query(User).filter_by(email=user_email).first()
         if not user:
             return jsonify({'success': False, 'error': 'Usuário não encontrado'}), 404
-
-        connections = session.query(FitnessConnection).filter_by(user_id=user.id).all()
-        connections_data = [conn.to_dict() for conn in connections]
-
+        
+        connections = []
+        
+        # ✅ BUSCAR CONEXÕES FITBIT
+        fitbit_user = session_db.query(FitbitUser).filter_by(user_id=user.id).first()
+        if fitbit_user:
+            connections.append({
+                'id': fitbit_user.id,
+                'platform': 'fitbit',
+                'user_id': user.id,
+                'device_id': fitbit_user.fitbit_user_id,
+                'is_active': True,
+                'connected_at': fitbit_user.created_at.isoformat() if fitbit_user.created_at else None,
+                'last_sync': None  # Você pode adicionar lógica de última sincronização
+            })
+        
+        # Buscar outras conexões (Strava, etc)
+        # ... código para outras plataformas ...
+        
+        print(f"✅ [FITNESS_CONNECTIONS] {len(connections)} conexões encontradas")
+        
         return jsonify({
             'success': True,
-            'connections': connections_data
-        }), 200
-
+            'connections': connections
+        })
+        
     except Exception as e:
-        print(f"❌ [FITNESS] Erro ao buscar conexões: {e}")
+        print(f"❌ [FITNESS_CONNECTIONS] Erro: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
-        session.close()
+        session_db.close()
 
 @app.route('/api/fitness/connect', methods=['POST'])
 def connect_fitness_app():
@@ -6332,82 +6349,64 @@ def fitbit_connect():
         print(f"❌ [FITBIT] Erro ao gerar URL: {e}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/fitbit/callback', methods=['GET'])
-def fitbit_callback():
-    """Processa callback OAuth do Fitbit"""
-    session = SessionLocal()
-    try:
+
         code = request.args.get('code')
         state = request.args.get('state')
+        user_email = request.args.get('state')
         
-        if not code:
-            return jsonify({'error': 'Código não fornecido'}), 400
-        
-        # Decodificar email
-        user_email = base64.b64decode(state).decode()
         print(f"🔄 [FITBIT] Processando callback para: {user_email}")
+        
+        # Buscar usuário
+        user = session_db.query(User).filter_by(email=user_email).first()
+        if not user:
+            return redirect(f"{FITBIT_REDIRECT_URI}?fitbit_connected=false&error=usuario_nao_encontrado")
         
         # Trocar código por tokens
         token_url = 'https://api.fitbit.com/oauth2/token'
-        auth_header = requests.auth.HTTPBasicAuth(FITBIT_CLIENT_ID, FITBIT_CLIENT_SECRET)
-        
+        auth = (FITBIT_CLIENT_ID, FITBIT_CLIENT_SECRET)
         data = {
             'client_id': FITBIT_CLIENT_ID,
             'grant_type': 'authorization_code',
-            'redirect_uri': FITBIT_REDIRECT_URI,
-            'code': code
+            'code': code,
+            'redirect_uri': FITBIT_REDIRECT_URI
         }
         
-        response = requests.post(token_url, auth=auth_header, data=data)
+        response = requests.post(token_url, auth=auth, data=data)
         
         if response.status_code != 200:
-            print(f"❌ [FITBIT] Erro ao trocar código: {response.text}")
-            return jsonify({'error': 'Falha ao obter tokens'}), 400
+            print(f"❌ [FITBIT] Erro ao obter tokens: {response.text}")
+            return redirect(f"{FITBIT_REDIRECT_URI}?fitbit_connected=false&error=token_error")
         
-        token_data = response.json()
+        tokens = response.json()
         
-        # Buscar usuário
-        user = session.query(User).filter_by(email=user_email).first()
-        if not user:
-            return jsonify({'error': 'Usuário não encontrado'}), 404
+        # ✅ AQUI É ONDE SALVA NO BANCO - VERIFICAR SE ESTÁ CORRETO:
+        fitbit_user = FitbitUser(
+            id=str(uuid.uuid4()),
+            user_id=user.id,
+            fitbit_user_id=tokens['user_id'],
+            access_token=tokens['access_token'],
+            refresh_token=tokens['refresh_token'],
+            expires_at=datetime.utcnow() + timedelta(seconds=tokens['expires_in']),
+            scope=tokens['scope']
+        )
         
-        # Criar ou atualizar FitbitUser
-        fitbit_user = session.query(FitbitUser).filter_by(user_id=user.id).first()
+        session_db.add(fitbit_user)
+        session_db.commit()
         
-        if fitbit_user:
-            fitbit_user.access_token = token_data['access_token']
-            fitbit_user.refresh_token = token_data['refresh_token']
-            fitbit_user.token_expires_at = datetime.utcnow() + timedelta(seconds=token_data['expires_in'])
-            fitbit_user.updated_at = datetime.utcnow()
-            print(f"✅ [FITBIT] Tokens atualizados para: {user_email}")
-        else:
-            fitbit_user = FitbitUser(
-                id=str(uuid.uuid4()),
-                user_id=user.id,
-                fitbit_user_id=token_data['user_id'],
-                access_token=token_data['access_token'],
-                refresh_token=token_data['refresh_token'],
-                token_expires_at=datetime.utcnow() + timedelta(seconds=token_data['expires_in'])
-            )
-            session.add(fitbit_user)
-            print(f"✅ [FITBIT] Nova conexão criada para: {user_email}")
+        print(f"✅ [FITBIT] Nova conexão criada para: {user_email}")
         
-        session.commit()
+        # Criar subscription
+        create_fitbit_subscription(fitbit_user, session_db)
         
-        # Criar subscription webhook
-        create_fitbit_subscription(fitbit_user, session)
-        
-        # Redirecionar para frontend
-        return redirect('https://betfit-frontend-thwz.onrender.com/dashboard?fitbit_connected=true')
+        return redirect(f"{FITBIT_REDIRECT_URI}?fitbit_connected=true")
         
     except Exception as e:
-        session.rollback()
         print(f"❌ [FITBIT] Erro no callback: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'error': str(e)}), 500
+        return redirect(f"{FITBIT_REDIRECT_URI}?fitbit_connected=false&error=erro_interno")
     finally:
-        session.close()
+        session_db.close()
 
 @app.route('/api/fitbit/webhook', methods=['GET', 'POST'])
 def fitbit_webhook():
