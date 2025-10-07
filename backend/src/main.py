@@ -6595,6 +6595,424 @@ def fitbit_status():
     finally:
         session_db.close()
 
+
+
+    # ==================== ROTAS DE TERMOS E POLÍTICAS ====================
+
+@app.route('/terms', methods=['GET'])
+def terms_of_service():
+    """Página de Termos de Serviço"""
+    return """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Termos de Serviço - BetFit</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: white;
+            min-height: 100vh;
+        }
+        .header {
+            text-align: center;
+            padding-bottom: 30px;
+            border-bottom: 2px solid #00B0B9;
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            color: #00B0B9;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        h2 {
+            color: #00B0B9;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+        p {
+            margin-bottom: 15px;
+            text-align: justify;
+        }
+        ul {
+            margin-left: 30px;
+            margin-bottom: 15px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        .back-button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 30px;
+            background: #00B0B9;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .back-button:hover {
+            background: #008A91;
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Termos de Serviço</h1>
+            <p>Última atualização: """ + datetime.now().strftime('%d/%m/%Y') + """</p>
+        </div>
+
+        <h2>1. Aceitação dos Termos</h2>
+        <p>
+            Ao acessar e utilizar a plataforma BetFit, você concorda em cumprir e estar vinculado 
+            aos seguintes Termos de Serviço. Se você não concordar com qualquer parte destes termos, 
+            não deve utilizar nossos serviços.
+        </p>
+
+        <h2>2. Descrição do Serviço</h2>
+        <p>
+            O BetFit é uma plataforma de desafios fitness onde usuários podem participar de competições 
+            baseadas em atividades físicas monitoradas através de dispositivos e aplicativos de fitness 
+            conectados, incluindo Fitbit, Strava, Apple Health, Google Fit e outros.
+        </p>
+
+        <h2>3. Elegibilidade</h2>
+        <p>Para utilizar o BetFit, você deve:</p>
+        <ul>
+            <li>Ter pelo menos 18 anos de idade</li>
+            <li>Fornecer informações verdadeiras e precisas durante o registro</li>
+            <li>Manter a confidencialidade de sua conta e senha</li>
+            <li>Ser responsável por todas as atividades realizadas em sua conta</li>
+        </ul>
+
+        <h2>4. Coleta de Dados Fitness</h2>
+        <p>
+            Ao conectar dispositivos de fitness (como Fitbit) ao BetFit, você autoriza a coleta, 
+            armazenamento e processamento dos seguintes dados:
+        </p>
+        <ul>
+            <li>Dados de atividades físicas (passos, distância, calorias)</li>
+            <li>Frequência cardíaca e métricas de saúde</li>
+            <li>Dados de sono e recuperação</li>
+            <li>Localização GPS das atividades (quando aplicável)</li>
+        </ul>
+
+        <h2>5. Uso dos Dados</h2>
+        <p>Os dados coletados são utilizados exclusivamente para:</p>
+        <ul>
+            <li>Validação automática de desafios completados</li>
+            <li>Cálculo de resultados e distribuição de prêmios</li>
+            <li>Estatísticas e análises de desempenho</li>
+            <li>Melhoria da experiência do usuário</li>
+        </ul>
+
+        <h2>6. Desafios e Apostas</h2>
+        <p>
+            Ao participar de um desafio no BetFit, você concorda que:
+        </p>
+        <ul>
+            <li>Os valores apostados não são reembolsáveis após a confirmação</li>
+            <li>Os resultados são baseados em dados verificados dos aplicativos conectados</li>
+            <li>A plataforma cobra uma taxa administrativa sobre o pool de prêmios</li>
+            <li>Tentativas de fraude resultarão em banimento permanente</li>
+        </ul>
+
+        <h2>7. Segurança e Privacidade</h2>
+        <p>
+            Implementamos medidas de segurança para proteger seus dados, incluindo:
+        </p>
+        <ul>
+            <li>Criptografia de tokens de acesso</li>
+            <li>Armazenamento seguro em servidores protegidos</li>
+            <li>Acesso restrito aos dados pessoais</li>
+            <li>Conformidade com LGPD (Lei Geral de Proteção de Dados)</li>
+        </ul>
+
+        <h2>8. Direitos do Usuário</h2>
+        <p>Você tem o direito de:</p>
+        <ul>
+            <li>Acessar todos os seus dados armazenados</li>
+            <li>Solicitar correção de dados incorretos</li>
+            <li>Desconectar dispositivos de fitness a qualquer momento</li>
+            <li>Excluir sua conta e todos os dados associados</li>
+        </ul>
+
+        <h2>9. Limitação de Responsabilidade</h2>
+        <p>
+            O BetFit não se responsabiliza por:
+        </p>
+        <ul>
+            <li>Falhas nos aplicativos de fitness de terceiros (Fitbit, Strava, etc.)</li>
+            <li>Dados incorretos fornecidos pelos dispositivos conectados</li>
+            <li>Lesões ou problemas de saúde decorrentes da participação em desafios</li>
+            <li>Perdas financeiras devido a apostas em desafios</li>
+        </ul>
+
+        <h2>10. Modificações dos Termos</h2>
+        <p>
+            Reservamo-nos o direito de modificar estes Termos de Serviço a qualquer momento. 
+            Alterações significativas serão notificadas por email ou através da plataforma.
+        </p>
+
+        <h2>11. Contato</h2>
+        <p>
+            Para dúvidas sobre estes Termos de Serviço, entre em contato:
+        </p>
+        <ul>
+            <li>Email: support@betfit.com</li>
+            <li>Website: https://betfit-frontend-thwz.onrender.com</li>
+        </ul>
+
+        <div class="footer">
+            <p>&copy; 2025 BetFit. Todos os direitos reservados.</p>
+            <a href="https://betfit-frontend-thwz.onrender.com" class="back-button">Voltar ao Site</a>
+        </div>
+    </div>
+</body>
+</html>
+    """
+
+@app.route('/privacy', methods=['GET'])
+def privacy_policy():
+    """Página de Política de Privacidade"""
+    return """
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Política de Privacidade - BetFit</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: white;
+            min-height: 100vh;
+        }
+        .header {
+            text-align: center;
+            padding-bottom: 30px;
+            border-bottom: 2px solid #00B0B9;
+            margin-bottom: 40px;
+        }
+        .header h1 {
+            color: #00B0B9;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        h2 {
+            color: #00B0B9;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-size: 1.5rem;
+        }
+        p {
+            margin-bottom: 15px;
+            text-align: justify;
+        }
+        ul {
+            margin-left: 30px;
+            margin-bottom: 15px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .footer {
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 1px solid #ddd;
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+        }
+        .back-button {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 30px;
+            background: #00B0B9;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .back-button:hover {
+            background: #008A91;
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Política de Privacidade</h1>
+            <p>Última atualização: """ + datetime.now().strftime('%d/%m/%Y') + """</p>
+        </div>
+
+        <h2>1. Introdução</h2>
+        <p>
+            A BetFit ("nós", "nosso" ou "plataforma") está comprometida em proteger a privacidade 
+            dos nossos usuários. Esta Política de Privacidade explica como coletamos, usamos, 
+            armazenamos e protegemos suas informações pessoais.
+        </p>
+
+        <h2>2. Informações que Coletamos</h2>
+        <p>Coletamos os seguintes tipos de informações:</p>
+        
+        <h3 style="color: #666; font-size: 1.2rem; margin-top: 20px;">2.1 Informações de Cadastro</h3>
+        <ul>
+            <li>Nome completo</li>
+            <li>Email</li>
+            <li>Senha (criptografada)</li>
+            <li>Telefone (opcional)</li>
+        </ul>
+
+        <h3 style="color: #666; font-size: 1.2rem; margin-top: 20px;">2.2 Dados de Fitness (via Fitbit, Strava, etc.)</h3>
+        <ul>
+            <li>Atividades físicas (corrida, caminhada, ciclismo)</li>
+            <li>Distância percorrida</li>
+            <li>Calorias queimadas</li>
+            <li>Passos diários</li>
+            <li>Frequência cardíaca</li>
+            <li>Dados de sono</li>
+            <li>Localização GPS das atividades</li>
+        </ul>
+
+        <h3 style="color: #666; font-size: 1.2rem; margin-top: 20px;">2.3 Dados Financeiros</h3>
+        <ul>
+            <li>Histórico de transações</li>
+            <li>Valores apostados e ganhos</li>
+            <li>Dados de pagamento (processados por terceiros seguros)</li>
+        </ul>
+
+        <h2>3. Como Usamos Suas Informações</h2>
+        <p>Utilizamos suas informações para:</p>
+        <ul>
+            <li>Criar e gerenciar sua conta</li>
+            <li>Processar participações em desafios</li>
+            <li>Validar automaticamente resultados de desafios</li>
+            <li>Processar pagamentos e prêmios</li>
+            <li>Enviar notificações sobre desafios e resultados</li>
+            <li>Melhorar nossos serviços e experiência do usuário</li>
+            <li>Prevenir fraudes e garantir segurança</li>
+        </ul>
+
+        <h2>4. Compartilhamento de Dados</h2>
+        <p>Seus dados NÃO são vendidos a terceiros. Compartilhamos informações apenas com:</p>
+        <ul>
+            <li><strong>Provedores de Fitness:</strong> Fitbit, Strava, Apple, Google (para sincronização de dados)</li>
+            <li><strong>Processadores de Pagamento:</strong> MercadoPago (para transações financeiras)</li>
+            <li><strong>Serviços de Hospedagem:</strong> Render.com (armazenamento seguro de dados)</li>
+            <li><strong>Autoridades Legais:</strong> Quando exigido por lei</li>
+        </ul>
+
+        <h2>5. Segurança dos Dados</h2>
+        <p>Implementamos medidas de segurança robustas:</p>
+        <ul>
+            <li>Criptografia SSL/TLS para todas as comunicações</li>
+            <li>Senhas armazenadas com hash seguro (SHA256)</li>
+            <li>Tokens de acesso criptografados</li>
+            <li>Acesso restrito aos servidores</li>
+            <li>Monitoramento contínuo de segurança</li>
+            <li>Backups regulares e seguros</li>
+        </ul>
+
+        <h2>6. Seus Direitos (LGPD)</h2>
+        <p>De acordo com a Lei Geral de Proteção de Dados (LGPD), você tem direito a:</p>
+        <ul>
+            <li><strong>Acesso:</strong> Solicitar cópia de todos os seus dados</li>
+            <li><strong>Correção:</strong> Atualizar dados incorretos ou desatualizados</li>
+            <li><strong>Exclusão:</strong> Solicitar a remoção de seus dados</li>
+            <li><strong>Portabilidade:</strong> Exportar seus dados em formato legível</li>
+            <li><strong>Oposição:</strong> Opor-se ao processamento de seus dados</li>
+            <li><strong>Revogação:</strong> Revogar consentimentos dados anteriormente</li>
+        </ul>
+
+        <h2>7. Retenção de Dados</h2>
+        <p>
+            Mantemos seus dados enquanto sua conta estiver ativa. Após exclusão da conta, 
+            dados financeiros são mantidos por 5 anos (exigência legal), e demais dados 
+            são deletados em até 30 dias.
+        </p>
+
+        <h2>8. Cookies e Tecnologias Similares</h2>
+        <p>Utilizamos cookies para:</p>
+        <ul>
+            <li>Manter você logado na plataforma</li>
+            <li>Lembrar suas preferências</li>
+            <li>Analisar uso da plataforma (Google Analytics)</li>
+            <li>Melhorar a experiência do usuário</li>
+        </ul>
+
+        <h2>9. Dados de Menores</h2>
+        <p>
+            Nossa plataforma não é direcionada a menores de 18 anos. Não coletamos 
+            intencionalmente dados de menores. Se descobrirmos que coletamos dados 
+            de um menor, deletaremos imediatamente.
+        </p>
+
+        <h2>10. Alterações nesta Política</h2>
+        <p>
+            Podemos atualizar esta Política de Privacidade periodicamente. Notificaremos 
+            sobre mudanças significativas por email ou através de aviso na plataforma.
+        </p>
+
+        <h2>11. Contato</h2>
+        <p>Para exercer seus direitos ou esclarecer dúvidas:</p>
+        <ul>
+            <li><strong>Email DPO:</strong> privacy@betfit.com</li>
+            <li><strong>Email Suporte:</strong> support@betfit.com</li>
+            <li><strong>Website:</strong> https://betfit-frontend-thwz.onrender.com</li>
+        </ul>
+
+        <div class="footer">
+            <p>&copy; 2025 BetFit. Todos os direitos reservados.</p>
+            <a href="https://betfit-frontend-thwz.onrender.com" class="back-button">Voltar ao Site</a>
+        </div>
+    </div>
+</body>
+</html>
+    """
+
+
 # ==================== MAIN ====================
 
 if __name__ == '__main__':
