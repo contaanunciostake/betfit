@@ -114,6 +114,93 @@ class FitnessData(Base):
             'processed_at': self.processed_at.isoformat() if self.processed_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
+    
+
+
+# ==================== MODELOS FITBIT ====================
+
+class FitbitUser(Base):
+    """Modelo para armazenar conexões Fitbit dos usuários"""
+    __tablename__ = 'fitbit_users'
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey('users.id'), nullable=False, index=True)
+    fitbit_user_id = Column(String(50), unique=True, nullable=False)
+    access_token = Column(String(500), nullable=False)
+    refresh_token = Column(String(500), nullable=False)
+    token_expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+    
+    # Relacionamento
+    user = relationship('User', backref='fitbit_connection')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'fitbit_user_id': self.fitbit_user_id,
+            'token_expires_at': self.token_expires_at.isoformat() if self.token_expires_at else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+class FitbitActivity(Base):
+    """Modelo para armazenar atividades do Fitbit"""
+    __tablename__ = 'fitbit_activities'
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    fitbit_user_id = Column(String, ForeignKey('fitbit_users.id'), nullable=False, index=True)
+    activity_id = Column(String(50), unique=True, nullable=False)
+    activity_type = Column(String(50))  # run, walk, bike, etc
+    start_time = Column(DateTime, nullable=False)
+    duration = Column(Integer)  # milissegundos
+    distance = Column(Float)  # km
+    calories = Column(Integer)
+    steps = Column(Integer)
+    received_at = Column(DateTime, default=datetime.datetime.utcnow)
+    raw_data = Column(Text)  # JSON completo
+    
+    # Relacionamento
+    fitbit_user = relationship('FitbitUser', backref='activities')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'fitbit_user_id': self.fitbit_user_id,
+            'activity_id': self.activity_id,
+            'activity_type': self.activity_type,
+            'start_time': self.start_time.isoformat() if self.start_time else None,
+            'duration': self.duration,
+            'distance': float(self.distance) if self.distance else 0.0,
+            'calories': self.calories,
+            'steps': self.steps,
+            'received_at': self.received_at.isoformat() if self.received_at else None
+        }
+
+class FitbitSubscription(Base):
+    """Modelo para armazenar subscriptions de webhooks Fitbit"""
+    __tablename__ = 'fitbit_subscriptions'
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    fitbit_user_id = Column(String, ForeignKey('fitbit_users.id'), nullable=False, index=True)
+    subscription_id = Column(String(100), unique=True, nullable=False)
+    collection_type = Column(String(50))  # activities, sleep, body
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    
+    # Relacionamento
+    fitbit_user = relationship('FitbitUser', backref='subscriptions')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'fitbit_user_id': self.fitbit_user_id,
+            'subscription_id': self.subscription_id,
+            'collection_type': self.collection_type,
+            'is_active': self.is_active,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
 
 class ChallengeValidation(Base):
     """Modelo para validação automática de desafios usando dados de fitness"""
