@@ -78,6 +78,21 @@ const ProfileDevices = ({ devices = [], onConnectDevice, onDisconnectDevice }) =
       required: false,
       nativeOnly: false
     },
+
+
+    // ====== ADICIONAR FITBIT AQUI ======
+{
+  id: 'fitbit',
+  name: 'Fitbit',
+  type: 'fitbit',
+  description: 'Conecte seu Fitbit para validação automática de atividades',
+  icon: Activity,
+  emoji: '⌚',
+  color: 'text-cyan-500',
+  platform: 'Web/Mobile',
+  required: false,
+  nativeOnly: false
+},
     // APLICATIVO TESTE CORRIGIDO
     {
       id: 'teste',
@@ -268,6 +283,9 @@ const ProfileDevices = ({ devices = [], onConnectDevice, onDisconnectDevice }) =
         await connectHealthKit(device);
       } else if (device.type === 'health_connect') {
         await connectHealthConnect(device);
+        // ====== ADICIONAR CASE FITBIT AQUI ======
+        } else if (device.type === 'fitbit') {
+        await connectFitbit(device);
       } else if (device.type === 'strava') {
         await connectStrava(device);
       } else if (device.type === 'teste') {
@@ -486,6 +504,75 @@ const ProfileDevices = ({ devices = [], onConnectDevice, onDisconnectDevice }) =
     }
     throw new Error('Health Connect ainda não implementado nesta versão');
   };
+
+  // ====== ADICIONAR FUNÇÃO FITBIT AQUI ======
+const connectFitbit = async (device) => {
+  try {
+    console.log('⌚ [CONNECT_FITBIT] Iniciando conexão com Fitbit...');
+    
+    // 1. Verificar se está no navegador
+    if (isNativeApp()) {
+      throw new Error('Fitbit deve ser conectado através do navegador web');
+    }
+
+    // 2. Verificar Client ID e Secret
+    const fitbitClientId = process.env.REACT_APP_FITBIT_CLIENT_ID;
+    if (!fitbitClientId) {
+      throw new Error('Client ID do Fitbit não configurado. Verifique as variáveis de ambiente.');
+    }
+
+    console.log('🔑 [CONNECT_FITBIT] Client ID encontrado');
+
+    // 3. URLs consistentes para desenvolvimento e produção
+    const isDevelopment = window.location.hostname === 'localhost';
+    const backendUrl = isDevelopment 
+      ? 'http://localhost:5001'
+      : 'https://betfit-backend.onrender.com';
+    
+    const redirectUri = isDevelopment
+      ? 'http://localhost:3000/fitbit/callback'
+      : 'https://betfit-frontend-thwz.onrender.com/fitbit/callback';
+
+    // 4. Solicitar URL de autorização ao backend
+    const token = localStorage.getItem('token');
+    const response = await fetch(`${backendUrl}/api/fitbit/connect?user_email=${user.email}`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao gerar URL de autorização');
+    }
+
+    const data = await response.json();
+    
+    if (!data.success || !data.authorization_url) {
+      throw new Error('URL de autorização não recebida');
+    }
+
+    console.log('🔗 [CONNECT_FITBIT] URL de autorização recebida');
+
+    // 5. Armazenar dados de conexão pendente
+    const pendingData = {
+      user_email: user.email,
+      started_at: Date.now(),
+      device_type: 'fitbit',
+      backend_url: backendUrl
+    };
+    localStorage.setItem('fitbit_connection_pending', JSON.stringify(pendingData));
+
+    // 6. Redirecionar para autorização (não popup, redirect direto)
+    console.log('🌐 [CONNECT_FITBIT] Redirecionando para autorização...');
+    window.location.href = data.authorization_url;
+
+  } catch (error) {
+    console.error('❌ [CONNECT_FITBIT] Erro:', error);
+    localStorage.removeItem('fitbit_connection_pending');
+    throw error;
+  }
+};
 
   const connectStrava = async (device) => {
   try {
@@ -798,9 +885,52 @@ useEffect(() => {
     if (user?.email) {
       stopMockActivitySimulation(user.email);
       stopStravaSync(user.email);
+      // ====== ADICIONAR AQUI ======
+      // Parar sincronização do Fitbit também
+      const fitbitIntervalId = localStorage.getItem(`fitbit_sync_${user.email}`);
+      if (fitbitIntervalId) {
+        clearInterval(parseInt(fitbitIntervalId));
+        localStorage.removeItem(`fitbit_sync_${user.email}`);
+      }
     }
   };
 }, [user?.email]); // <- Certifique-se que esta chave está fechada
+
+
+// ====== ADICIONAR NOVO USEEFFECT AQUI ======
+// Verificar callback do Fitbit
+useEffect(() => {
+  const checkFitbitCallback = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const fitbitConnected = urlParams.get('fitbit_connected');
+    
+    if (fitbitConnected === 'true') {
+      console.log('✅ [FITBIT_CALLBACK] Fitbit conectado com sucesso!');
+      setSuccess('Fitbit conectado com sucesso! Suas atividades serão sincronizadas automaticamente.');
+      
+      // Limpar URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      // Recarregar conexões após 1 segundo
+      setTimeout(() => {
+        loadFitnessConnections(true);
+      }, 1000);
+      
+      localStorage.removeItem('fitbit_connection_pending');
+    } else if (fitbitConnected === 'false') {
+      const error = urlParams.get('error');
+      console.error('❌ [FITBIT_CALLBACK] Erro:', error);
+      setError(error || 'Erro ao conectar Fitbit');
+      
+      // Limpar URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+      
+      localStorage.removeItem('fitbit_connection_pending');
+    }
+  };
+  
+  checkFitbitCallback();
+}, []);
 
 // Desconectar dispositivo
 const handleDisconnectDevice = async (device) => {
@@ -1111,4 +1241,3 @@ const handleDisconnectDevice = async (device) => {
 };
 
 export default ProfileDevices;
-
