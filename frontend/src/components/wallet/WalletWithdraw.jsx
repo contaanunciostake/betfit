@@ -42,7 +42,7 @@ const WalletWithdraw = ({ balance }) => {
 
   const handleWithdraw = async () => {
     const withdrawAmount = parseFloat(amount);
-    
+
     if (!amount || withdrawAmount < minWithdraw) {
       alert(`Valor mínimo para saque é ${formatCurrency(minWithdraw)}`);
       return;
@@ -60,13 +60,39 @@ const WalletWithdraw = ({ balance }) => {
 
     setIsProcessing(true);
 
-    // Simulate processing time
-    setTimeout(() => {
+    try {
+      // Get user email from localStorage or context
+      const userEmail = localStorage.getItem('userEmail') || '';
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/wallet/withdraw/pix`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          user_email: userEmail,
+          amount: withdrawAmount,
+          pix_key: pixKey
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert(`Saque solicitado com sucesso! Você receberá R$ ${data.amount.toFixed(2)}. ${data.estimated_time === 'Imediato' ? 'Aprovado automaticamente!' : 'Aguardando aprovação manual.'}`);
+        setAmount('');
+        setPixKey('');
+        // Refresh balance if callback provided
+        if (typeof window.refreshWallet === 'function') {
+          window.refreshWallet();
+        }
+      } else {
+        alert(data.error || 'Erro ao processar saque');
+      }
+    } catch (error) {
+      alert('Erro de conexão. Tente novamente.');
+      console.error('Erro ao processar saque:', error);
+    } finally {
       setIsProcessing(false);
-      alert('Solicitação de saque enviada! Processamento em até 2 horas.');
-      setAmount('');
-      setPixKey('');
-    }, 2000);
+    }
   };
 
   const formatCurrency = (value) => {
@@ -78,8 +104,8 @@ const WalletWithdraw = ({ balance }) => {
   };
 
   const calculateFee = (amount) => {
-    if (withdrawMethod === 'pix') return 0;
-    return Math.max(amount * 0.025, 2.50); // 2.5% min R$ 2,50
+    // Novo sistema: 2% com mínimo de R$5 para PIX
+    return Math.max(amount * 0.02, 5.00);
   };
 
   const getNetAmount = () => {
@@ -198,10 +224,10 @@ const WalletWithdraw = ({ balance }) => {
               <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/20">
                 <div className="flex items-center space-x-2 mb-2">
                   <CheckCircle className="w-4 h-4 text-green-500" />
-                  <span className="font-medium text-green-700 dark:text-green-400">PIX Gratuito</span>
+                  <span className="font-medium text-green-700 dark:text-green-400">Saque PIX</span>
                 </div>
                 <p className="text-sm text-green-600 dark:text-green-500">
-                  Sem taxas. Processamento em até 2 horas.
+                  Taxa: 2% (mín. R$5). Processamento imediato para valores abaixo de R$1.000.
                 </p>
               </div>
 

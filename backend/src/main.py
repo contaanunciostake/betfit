@@ -1,11 +1,33 @@
+# -*- coding: utf-8 -*-
 import os
+import sys
+
+# Configurar encoding UTF-8 para stdout no Windows
+if sys.platform == 'win32':
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 from dotenv import load_dotenv
 
-# Carregar variáveis do arquivo .env
-load_dotenv()
+# Carregar vari�veis do arquivo .env (prioriza .env.local para desenvolvimento local)
+# Se .env.local existir, usa ele; sen�o usa .env (produ��o/Render)
+env_local_path = os.path.join(os.path.dirname(__file__), '..', '.env.local')
+env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 
-# Configurar DATABASE_PATH com .env
-DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql://betfit_user:O0GZk1NKx7qvJFleiWEaUZcYFMkjCmtS@dpg-d3a9ou0dl3ps73ekkgmg-a.oregon-postgres.render.com/betfit_4on3')
+if os.path.exists(env_local_path):
+    print("[OK] Carregando configuracoes LOCAL de: .env.local")
+    load_dotenv(env_local_path)
+else:
+    print("[OK] Carregando configuracoes de PRODUCAO de: .env")
+    load_dotenv(env_path)
+
+# Configurar DATABASE_URL com .env (se vazio, usa SQLite local)
+DATABASE_URL = os.getenv('DATABASE_URL', '')
+if not DATABASE_URL:
+    print("[INFO] DATABASE_URL vazio - usando SQLite local")
+    DATABASE_URL = None  # SQLite ser� usado pelo models.py
+else:
+    print(f"[INFO] Usando banco de dados: {DATABASE_URL.split('@')[1] if '@' in DATABASE_URL else 'SQLite'}")
 
 #!/usr/bin/env python3
 import hashlib
@@ -34,7 +56,7 @@ sys.path.append(os.path.dirname(__file__))
 try:
     from SystemSettings import SystemSettings
 except ImportError as e:
-    print(f"❌ Erro ao importar SystemSettings: {e}")
+    print(f"[ERROR] Erro ao importar SystemSettings: {e}")
     sys.exit(1)
 
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
@@ -50,23 +72,23 @@ import base64
 import qrcode
 from io import BytesIO
 
-# Configuração do MercadoPago
+# Configura��o do MercadoPago
 ACCESS_TOKEN = os.getenv('MERCADOPAGO_ACCESS_TOKEN', 'TEST-8579538386825-092106-1f98bb571ef94fc810798d6d9473ee79-17728094')
 PUBLIC_KEY = os.getenv('MERCADOPAGO_PUBLIC_KEY', 'TEST-50581e2-ed94-400e-92ab-45ca00af5ef2')
 
-# Instância global do SDK
+# Inst�ncia global do SDK
 sdk = None
 
-# Variáveis globais para MercadoPago (serão inicializadas sob demanda)
+# Vari�veis globais para MercadoPago (ser�o inicializadas sob demanda)
 sdk = None
 MERCADOPAGO_ACCESS_TOKEN = None
 MERCADOPAGO_PUBLIC_KEY = None
 
-# Habilitar CORS para localhost - CONFIGURAÇÃO ATUALIZADA
+# Habilitar CORS para localhost - CONFIGURA��O ATUALIZADA
 cors_origins = os.getenv('CORS_ORIGINS', '').split(',')
 if not cors_origins or cors_origins == ['']:
     cors_origins = [
-        # URLs de produção Render
+        # URLs de produ��o Render
         "https://betfit-backend.onrender.com",
         "https://betfit-frontend-thwz.onrender.com",
         
@@ -120,16 +142,16 @@ def serve_logo(filename):
     return send_from_directory(logo_dir, filename)
 
 
-# ================== INICIALIZAÇÃO DO SISTEMA DE CONFIGURAÇÕES ==================
+# ================== INICIALIZA��O DO SISTEMA DE CONFIGURA��ES ==================
 
 # ================== SUAS ROTAS EXISTENTES FICAM AQUI ==================
-# (Mantenha todas as suas rotas existentes nesta seção)
+# (Mantenha todas as suas rotas existentes nesta se��o)
 
-# ================== ENDPOINT PÚBLICO DE CONFIGURAÇÕES PARA O FRONTEND (VERSÃO CORRIGIDA) ==================
+# ================== ENDPOINT P�BLICO DE CONFIGURA��ES PARA O FRONTEND (VERS�O CORRIGIDA) ==================
 
 @app.route('/api/settings', methods=['GET'])
 @cross_origin(origins=[
-    # URLs de produção Render
+    # URLs de produ��o Render
     "https://betfit-backend.onrender.com",
     "https://betfit-frontend-thwz.onrender.com",
     
@@ -150,13 +172,13 @@ def serve_logo(filename):
 def get_public_settings():
     """
     Endpoint otimizado para o frontend.
-    Busca todas as configurações e retorna um único objeto JSON chave-valor.
+    Busca todas as configura��es e retorna um �nico objeto JSON chave-valor.
     """
     try:
-        # Busca todas as configurações do SystemSettings
+        # Busca todas as configura��es do SystemSettings
         settings_by_section = settings_manager.get_all()
 
-        # "Achata" o dicionário para criar um objeto único
+        # "Achata" o dicion�rio para criar um objeto �nico
         flat_settings = {}
         for section in settings_by_section.values():
             flat_settings.update(section)
@@ -164,7 +186,7 @@ def get_public_settings():
         return jsonify(flat_settings), 200
 
     except Exception as e:
-        logging.error(f"Erro ao buscar configurações públicas: {str(e)}")
+        logging.error(f"Erro ao buscar configura��es p�blicas: {str(e)}")
         return jsonify({
             'platform_name': 'BetFit',
             'platform_description': 'Plataforma de apostas fitness',
@@ -183,7 +205,7 @@ def handle_tunnel_headers():
     if os.getenv('BYPASS_TUNNEL_REMINDER'):
         request.environ['HTTP_BYPASS_TUNNEL_REMINDER'] = '1'
 
-# ================== NOVAS ROTAS DE CONFIGURAÇÕES ADMINISTRATIVAS ==================
+# ================== NOVAS ROTAS DE CONFIGURA��ES ADMINISTRATIVAS ==================
 
 @app.route('/api/admin/settings', methods=['GET', 'OPTIONS'])
 @cross_origin(origins=[
@@ -194,7 +216,7 @@ def handle_tunnel_headers():
     "https://betfit-api.loca.lt"
 ])
 def get_all_settings():
-    """Buscar todas as configurações do sistema"""
+    """Buscar todas as configura��es do sistema"""
     if request.method == 'OPTIONS':
         return '', 200
     
@@ -207,7 +229,7 @@ def get_all_settings():
         }), 200
         
     except Exception as e:
-        logging.error(f"Erro ao buscar configurações: {str(e)}")
+        logging.error(f"Erro ao buscar configura��es: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'Erro interno do servidor'
@@ -216,7 +238,7 @@ def get_all_settings():
 @app.route('/api/admin/settings/<section>', methods=['GET', 'PUT', 'OPTIONS'])
 @cross_origin(origins=["http://localhost:3000", "http://localhost:5173", "http://localhost:8080", "http://192.168.1.69:8080", "http://localhost:5174", "http://localhost:5001"])
 def handle_settings_section(section):
-    """Gerenciar configurações com suporte para múltiplos logos"""
+    """Gerenciar configura��es com suporte para m�ltiplos logos"""
     if request.method == 'OPTIONS':
         return '', 200
     
@@ -253,7 +275,7 @@ def handle_settings_section(section):
             
             data[logo_field] = f"/uploads/logos/{unique_filename}"
             
-            # Adicionar outros dados do formulário
+            # Adicionar outros dados do formul�rio
             for key, value in request.form.items():
                 if key not in logo_types:
                     data[key] = value
@@ -289,12 +311,12 @@ def handle_settings_section(section):
                     if file and file.filename != '':
                         uploaded_file = file
                         logo_field = db_field
-                        logging.info(f"✅ Arquivo '{file_field}' detectado: {file.filename}")
+                        logging.info(f"[OK] Arquivo '{file_field}' detectado: {file.filename}")
                         break
 
             if uploaded_file:
                 data = request.form.to_dict()
-                logging.info(f"Dados do formulário recebidos: {data}")
+                logging.info(f"Dados do formul�rio recebidos: {data}")
                 
                 filename = secure_filename(uploaded_file.filename)
                 unique_filename = f"{uuid.uuid4().hex}_{filename}"
@@ -307,48 +329,48 @@ def handle_settings_section(section):
                 save_path = os.path.join(upload_path, unique_filename)
                 logging.info(f"Tentando salvar arquivo em: {save_path}")
                 uploaded_file.save(save_path)
-                logging.info("✅ Arquivo salvo com sucesso no servidor.")
+                logging.info("[OK] Arquivo salvo com sucesso no servidor.")
                 
                 data[logo_field] = f"/uploads/logos/{unique_filename}"
             
             elif request.is_json:
-                logging.info("Requisição é JSON. Usando request.get_json().")
+                logging.info("Requisi��o � JSON. Usando request.get_json().")
                 data = request.get_json()
             
             else:
-                logging.error(f"❌ Formato de requisição não esperado. Content-Type: {request.content_type}")
-                return jsonify({'success': False, 'error': 'Formato de dados inválido.'}), 400
+                logging.error(f"[ERROR] Formato de requisi��o n�o esperado. Content-Type: {request.content_type}")
+                return jsonify({'success': False, 'error': 'Formato de dados inv�lido.'}), 400
 
             if not data:
-                logging.error("❌ Dados não fornecidos na requisição.")
-                return jsonify({'success': False, 'error': 'Dados não fornecidos'}), 400
+                logging.error("[ERROR] Dados n�o fornecidos na requisi��o.")
+                return jsonify({'success': False, 'error': 'Dados n�o fornecidos'}), 400
             
-            logging.info(f"Dados a serem salvos na seção '{section}': {data}")
+            logging.info(f"Dados a serem salvos na se��o '{section}': {data}")
 
             # DEBUG: Verificar se os campos existem no banco
             if logo_field in ['platform_logo_white', 'platform_logo_black']:
-                logging.info(f"🔍 Tentando salvar campo novo: {logo_field}")
+                logging.info(f"[SEARCH] Tentando salvar campo novo: {logo_field}")
                 # Verificar se o campo existe na tabela
                 try:
                     test_value = settings_manager.get('general', logo_field.replace('platform_', ''))
-                    logging.info(f"✅ Campo {logo_field} existe no banco")
+                    logging.info(f"[OK] Campo {logo_field} existe no banco")
                 except Exception as e:
-                    logging.error(f"❌ Campo {logo_field} NÃO existe no banco: {e}")
+                    logging.error(f"[ERROR] Campo {logo_field} N�O existe no banco: {e}")
 
-            # Conversão de strings boolean
+            # Convers�o de strings boolean
             for key, value in data.items():
                 if isinstance(value, str):
                     if value.lower() == 'true': data[key] = True
                     elif value.lower() == 'false': data[key] = False
             
             updated_count = settings_manager.update_section(section, data)
-            logging.info(f"✅ {updated_count} registro(s) atualizado(s) no banco.")
+            logging.info(f"[OK] {updated_count} registro(s) atualizado(s) no banco.")
             
-            return jsonify({'success': True, 'message': f'Configurações da seção {section} atualizadas.'}), 200
+            return jsonify({'success': True, 'message': f'Configura��es da se��o {section} atualizadas.'}), 200
             
     except Exception as e:
         import traceback
-        logging.error(f"❌ ERRO CRÍTICO na seção {section}: {str(e)}")
+        logging.error(f"[ERROR] ERRO CR�TICO na se��o {section}: {str(e)}")
         logging.error(traceback.format_exc())
         return jsonify({'success': False, 'error': 'Erro interno do servidor.'}), 500
 
@@ -356,29 +378,29 @@ def handle_settings_section(section):
 
 @app.route('/api/fitbit/callback', methods=['GET'])
 def fitbit_callback():
-    """Callback OAuth - Recebe código de autorização"""
+    """Callback OAuth - Recebe c�digo de autoriza��o"""
     session_db = SessionLocal()
     try:
         code = request.args.get('code')
         state = request.args.get('state')
-        user_email = state  # O state contém o email
+        user_email = state  # O state cont�m o email
         
-        print(f"🔄 [FITBIT] Processando callback para: {user_email}")
-        print(f"🔍 [FITBIT] Code: {code[:20] if code else 'NONE'}...")
-        print(f"🔑 [FITBIT] Usando Client ID: {FITBIT_CLIENT_ID}")
-        print(f"🔗 [FITBIT] Redirect URI: {FITBIT_REDIRECT_URI}")
+        print(f"[SYNC] [FITBIT] Processando callback para: {user_email}")
+        print(f"[SEARCH] [FITBIT] Code: {code[:20] if code else 'NONE'}...")
+        print(f"[KEY] [FITBIT] Usando Client ID: {FITBIT_CLIENT_ID}")
+        print(f"[LINK] [FITBIT] Redirect URI: {FITBIT_REDIRECT_URI}")
         
         if not code:
-            print(f"❌ [FITBIT] Código de autorização não recebido")
+            print(f"[ERROR] [FITBIT] C�digo de autoriza��o n�o recebido")
             return redirect(f"{FITBIT_REDIRECT_URI}?fitbit_connected=false&error=no_code")
         
-        # Validar usuário
+        # Validar usu�rio
         user = session_db.query(User).filter_by(email=user_email).first()
         if not user:
-            print(f"❌ [FITBIT] Usuário não encontrado: {user_email}")
+            print(f"[ERROR] [FITBIT] Usu�rio n�o encontrado: {user_email}")
             return redirect(f"{FITBIT_REDIRECT_URI}?fitbit_connected=false&error=usuario_nao_encontrado")
         
-        # Trocar código por tokens
+        # Trocar c�digo por tokens
         token_url = 'https://api.fitbit.com/oauth2/token'
         auth = (FITBIT_CLIENT_ID, FITBIT_CLIENT_SECRET)
         data = {
@@ -388,11 +410,11 @@ def fitbit_callback():
             'redirect_uri': FITBIT_REDIRECT_URI
         }
         
-        print(f"🔐 [FITBIT] Solicitando tokens ao Fitbit...")
+        print(f"[LOCK] [FITBIT] Solicitando tokens ao Fitbit...")
         response = requests.post(token_url, auth=auth, data=data)
         
         if response.status_code != 200:
-            print(f"❌ [FITBIT] Erro {response.status_code}: {response.text}")
+            print(f"[ERROR] [FITBIT] Erro {response.status_code}: {response.text}")
             return redirect(f"{FITBIT_REDIRECT_URI}?fitbit_connected=false&error=token_error")
         
         tokens = response.json()
@@ -402,9 +424,9 @@ def fitbit_callback():
         expires_in = tokens.get('expires_in', 28800)
         scope = tokens.get('scope', '')
         
-        print(f"✅ [FITBIT] Tokens recebidos - User ID: {fitbit_user_id}")
+        print(f"[OK] [FITBIT] Tokens recebidos - User ID: {fitbit_user_id}")
         
-        # ✅ CORREÇÃO: Usar user_id ao invés de user_email
+        # [OK] CORRE��O: Usar user_id ao inv�s de user_email
         existing = session_db.query(FitnessConnection).filter_by(
             user_id=user.id,
             platform='fitbit'
@@ -413,7 +435,7 @@ def fitbit_callback():
         expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
         
         if existing:
-            print(f"🔄 [FITBIT] Atualizando conexão existente: {existing.id}")
+            print(f"[SYNC] [FITBIT] Atualizando conex�o existente: {existing.id}")
             existing.platform_user_id = fitbit_user_id
             existing.access_token = access_token
             existing.refresh_token = refresh_token
@@ -425,7 +447,7 @@ def fitbit_callback():
             existing.updated_at = datetime.utcnow()
             connection_id = existing.id
         else:
-            print(f"🆕 [FITBIT] Criando nova conexão...")
+            print(f"[NEW] [FITBIT] Criando nova conex�o...")
             new_connection = FitnessConnection(
                 id=str(uuid.uuid4()),
                 user_id=user.id,
@@ -446,7 +468,7 @@ def fitbit_callback():
             connection_id = new_connection.id
         
         session_db.commit()
-        print(f"💾 [FITBIT] Conexão salva: {connection_id}")
+        print(f"[DB] [FITBIT] Conex�o salva: {connection_id}")
         
         # Criar subscription
         try:
@@ -456,16 +478,16 @@ def fitbit_callback():
             sub_response = requests.post(sub_url, headers=headers)
             
             if sub_response.status_code in [200, 201, 409]:
-                print(f"✅ [FITBIT] Subscription: {subscription_id}")
+                print(f"[OK] [FITBIT] Subscription: {subscription_id}")
             else:
-                print(f"⚠️ [FITBIT] Subscription erro: {sub_response.status_code}")
+                print(f"[WARNING] [FITBIT] Subscription erro: {sub_response.status_code}")
         except Exception as e:
-            print(f"⚠️ [FITBIT] Erro subscription: {e}")
+            print(f"[WARNING] [FITBIT] Erro subscription: {e}")
         
         return redirect(f"{FITBIT_REDIRECT_URI}?fitbit_connected=true")
         
     except Exception as e:
-        print(f"❌ [FITBIT] Erro: {e}")
+        print(f"[ERROR] [FITBIT] Erro: {e}")
         import traceback
         traceback.print_exc()
         session_db.rollback()
@@ -475,7 +497,7 @@ def fitbit_callback():
 
 
 
-        # Rotas para integração Strava
+        # Rotas para integra��o Strava
 @app.route('/api/auth/strava/callback', methods=['GET'])
 def strava_callback():
     """Callback do OAuth do Strava"""
@@ -484,16 +506,16 @@ def strava_callback():
         state = request.args.get('state')
         
         if not code:
-            return jsonify({'error': 'Código de autorização não fornecido'}), 400
+            return jsonify({'error': 'C�digo de autoriza��o n�o fornecido'}), 400
         
         # Decodificar state
         try:
             state_data = json.loads(base64.b64decode(state).decode())
             user_email = state_data['user_email']
         except:
-            return jsonify({'error': 'State inválido'}), 400
+            return jsonify({'error': 'State inv�lido'}), 400
         
-        # Trocar código por access token
+        # Trocar c�digo por access token
         token_data = {
             'client_id': os.getenv('STRAVA_CLIENT_ID'),
             'client_secret': os.getenv('STRAVA_CLIENT_SECRET'),
@@ -506,14 +528,14 @@ def strava_callback():
         if response.status_code == 200:
             token_info = response.json()
             
-            # Salvar conexão no banco
+            # Salvar conex�o no banco
             session = SessionLocal()
             try:
                 user = session.query(User).filter_by(email=user_email).first()
                 if not user:
-                    return jsonify({'error': 'Usuário não encontrado'}), 404
+                    return jsonify({'error': 'Usu�rio n�o encontrado'}), 404
                 
-                # Criar conexão Strava
+                # Criar conex�o Strava
                 connection = FitnessConnection(
                     user_id=user.id,
                     platform='strava',
@@ -539,7 +561,7 @@ def strava_callback():
             finally:
                 session.close()
         
-        return jsonify({'error': 'Falha na autorização'}), 400
+        return jsonify({'error': 'Falha na autoriza��o'}), 400
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -554,9 +576,9 @@ def sync_strava_activities():
         
         user = session.query(User).filter_by(email=user_email).first()
         if not user:
-            return jsonify({'error': 'Usuário não encontrado'}), 404
+            return jsonify({'error': 'Usu�rio n�o encontrado'}), 404
         
-        # Buscar conexão Strava
+        # Buscar conex�o Strava
         connection = session.query(FitnessConnection).filter_by(
             user_id=user.id,
             platform='strava',
@@ -564,7 +586,7 @@ def sync_strava_activities():
         ).first()
         
         if not connection:
-            return jsonify({'error': 'Conexão Strava não encontrada'}), 404
+            return jsonify({'error': 'Conex�o Strava n�o encontrada'}), 404
         
         # Buscar atividades recentes do Strava
         headers = {'Authorization': f'Bearer {connection.access_token}'}
@@ -582,7 +604,7 @@ def sync_strava_activities():
         
         # Processar cada atividade
         for activity in activities:
-            # Verificar se atividade já foi processada
+            # Verificar se atividade j� foi processada
             existing_data = session.query(FitnessData).filter_by(
                 user_id=user.id,
                 external_id=str(activity['id'])
@@ -642,7 +664,7 @@ def check_challenge_completion(session, user_id, fitness_data):
     """Verificar se uma atividade completa algum desafio"""
     completions = []
     
-    # Buscar participações ativas do usuário
+    # Buscar participa��es ativas do usu�rio
     participations = session.query(ChallengeParticipation).filter_by(
         user_id=user_id,
         status='active'
@@ -654,7 +676,7 @@ def check_challenge_completion(session, user_id, fitness_data):
         if not challenge or challenge.status != 'active':
             continue
         
-        # Verificar se atividade atende aos critérios
+        # Verificar se atividade atende aos crit�rios
         if (challenge.target_metric == fitness_data.data_type and 
             fitness_data.value >= challenge.target_value):
             
@@ -663,7 +685,7 @@ def check_challenge_completion(session, user_id, fitness_data):
             participation.completed_at = datetime.utcnow()
             participation.result_value = fitness_data.value
             
-            # Calcular prêmio
+            # Calcular pr�mio
             prize_amount = calculate_prize(session, challenge)
             
             # Atualizar carteira
@@ -684,19 +706,19 @@ def check_challenge_completion(session, user_id, fitness_data):
     
     return completions
 
-# ✅ CORRETO
+# [OK] CORRETO
 def get_fitness_connections(user_email):
-    """Retorna conexões fitness do usuário"""
+    """Retorna conex�es fitness do usu�rio"""
     session_db = SessionLocal()
     try:
-        print(f"📡 [GET_CONNECTIONS] Buscando para: {user_email}")
+        print(f"[SIGNAL] [GET_CONNECTIONS] Buscando para: {user_email}")
         
-        # ✅ Buscar user_id primeiro
+        # [OK] Buscar user_id primeiro
         user = session_db.query(User).filter_by(email=user_email).first()
         if not user:
-            return jsonify({'success': False, 'error': 'Usuário não encontrado'}), 404
+            return jsonify({'success': False, 'error': 'Usu�rio n�o encontrado'}), 404
         
-        # ✅ Usar user_id para buscar conexões
+        # [OK] Usar user_id para buscar conex�es
         connections = session_db.query(FitnessConnection).filter_by(
             user_id=user.id,
             is_active=True
@@ -716,7 +738,7 @@ def get_fitness_connections(user_email):
                 'permissions': conn.permissions if hasattr(conn, 'permissions') else []
             })
         
-        print(f"✅ [GET_CONNECTIONS] {len(result)} encontradas")
+        print(f"[OK] [GET_CONNECTIONS] {len(result)} encontradas")
         
         return jsonify({
             'success': True,
@@ -724,7 +746,7 @@ def get_fitness_connections(user_email):
         })
         
     except Exception as e:
-        print(f"❌ [GET_CONNECTIONS] Erro: {e}")
+        print(f"[ERROR] [GET_CONNECTIONS] Erro: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -734,38 +756,38 @@ def get_fitness_connections(user_email):
 
 @app.route('/api/strava/webhook', methods=['GET', 'POST'])
 def strava_webhook():
-    """Receber notificações em tempo real do Strava"""
+    """Receber notifica��es em tempo real do Strava"""
     
     if request.method == 'GET':
-        # Verificação inicial do webhook (Strava vai chamar isso primeiro)
+        # Verifica��o inicial do webhook (Strava vai chamar isso primeiro)
         challenge = request.args.get('hub.challenge')
         verify_token = request.args.get('hub.verify_token')
         
-        print(f"🔍 [WEBHOOK] Verificação: token={verify_token}, challenge={challenge}")
+        print(f"[SEARCH] [WEBHOOK] Verifica��o: token={verify_token}, challenge={challenge}")
         
-        # Use um token que você definir nas variáveis de ambiente
+        # Use um token que voc� definir nas vari�veis de ambiente
         if verify_token == os.getenv('STRAVA_WEBHOOK_VERIFY_TOKEN'):
-            print("✅ [WEBHOOK] Token verificado com sucesso!")
+            print("[OK] [WEBHOOK] Token verificado com sucesso!")
             return jsonify({'hub.challenge': challenge})
         
-        print("❌ [WEBHOOK] Token inválido!")
+        print("[ERROR] [WEBHOOK] Token inv�lido!")
         return 'Forbidden', 403
     
     elif request.method == 'POST':
         try:
             data = request.get_json()
-            print(f"🎯 [WEBHOOK] Evento recebido: {data}")
+            print(f"[TARGET] [WEBHOOK] Evento recebido: {data}")
             
-            # Verificar se é uma nova atividade criada
+            # Verificar se � uma nova atividade criada
             if (data.get('object_type') == 'activity' and 
                 data.get('aspect_type') == 'create'):
                 
                 athlete_id = data.get('owner_id')
                 activity_id = data.get('object_id')
                 
-                print(f"🏃 [WEBHOOK] Nova atividade detectada!")
-                print(f"👤 Atleta ID: {athlete_id}")
-                print(f"🏃 Atividade ID: {activity_id}")
+                print(f"[RUN] [WEBHOOK] Nova atividade detectada!")
+                print(f"[USER] Atleta ID: {athlete_id}")
+                print(f"[RUN] Atividade ID: {activity_id}")
                 
                 # Processar atividade IMEDIATAMENTE
                 process_strava_activity_webhook(athlete_id, activity_id)
@@ -773,16 +795,16 @@ def strava_webhook():
             return jsonify({'status': 'EVENT_RECEIVED'}), 200
             
         except Exception as e:
-            print(f"❌ [WEBHOOK] Erro processando evento: {e}")
+            print(f"[ERROR] [WEBHOOK] Erro processando evento: {e}")
             return jsonify({'error': str(e)}), 500
 
 def process_strava_activity_webhook(athlete_id, activity_id):
     """Processar atividade do webhook em tempo real"""
     session = SessionLocal()
     try:
-        print(f"🔍 [WEBHOOK] Buscando conexão para atleta {athlete_id}...")
+        print(f"[SEARCH] [WEBHOOK] Buscando conex�o para atleta {athlete_id}...")
         
-        # Encontrar a conexão do usuário pelo athlete_id
+        # Encontrar a conex�o do usu�rio pelo athlete_id
         connection = session.query(FitnessConnection).filter_by(
             platform='strava',
             platform_user_id=str(athlete_id),
@@ -790,14 +812,14 @@ def process_strava_activity_webhook(athlete_id, activity_id):
         ).first()
         
         if not connection:
-            print(f"⚠️ [WEBHOOK] Conexão não encontrada para atleta {athlete_id}")
+            print(f"[WARNING] [WEBHOOK] Conex�o n�o encontrada para atleta {athlete_id}")
             return
         
-        print(f"✅ [WEBHOOK] Conexão encontrada! Usuário: {connection.user_id}")
+        print(f"[OK] [WEBHOOK] Conex�o encontrada! Usu�rio: {connection.user_id}")
         
-        # Buscar detalhes da atividade específica no Strava
+        # Buscar detalhes da atividade espec�fica no Strava
         headers = {'Authorization': f'Bearer {connection.access_token}'}
-        print(f"🌐 [WEBHOOK] Buscando detalhes da atividade {activity_id}...")
+        print(f"[WEB] [WEBHOOK] Buscando detalhes da atividade {activity_id}...")
         
         activity_response = requests.get(
             f'https://www.strava.com/api/v3/activities/{activity_id}',
@@ -805,7 +827,7 @@ def process_strava_activity_webhook(athlete_id, activity_id):
         )
         
         if activity_response.status_code != 200:
-            print(f"❌ [WEBHOOK] Erro ao buscar atividade: {activity_response.status_code}")
+            print(f"[ERROR] [WEBHOOK] Erro ao buscar atividade: {activity_response.status_code}")
             print(f"Response: {activity_response.text}")
             return
         
@@ -814,19 +836,19 @@ def process_strava_activity_webhook(athlete_id, activity_id):
         distance_km = activity.get('distance', 0) / 1000
         activity_type = activity.get('type', 'Unknown')
         
-        print(f"🏃 [WEBHOOK] Atividade obtida:")
-        print(f"  📝 Nome: {activity_name}")
-        print(f"  🏃 Tipo: {activity_type}")
-        print(f"  📏 Distância: {distance_km:.2f} km")
+        print(f"[RUN] [WEBHOOK] Atividade obtida:")
+        print(f"  [NOTE] Nome: {activity_name}")
+        print(f"  [RUN] Tipo: {activity_type}")
+        print(f"  [MEASURE] Dist�ncia: {distance_km:.2f} km")
         
-        # Verificar se já foi processada
+        # Verificar se j� foi processada
         existing_data = session.query(FitnessData).filter_by(
             user_id=connection.user_id,
             external_id=str(activity_id)
         ).first()
         
         if existing_data:
-            print(f"⚠️ [WEBHOOK] Atividade {activity_id} já foi processada")
+            print(f"[WARNING] [WEBHOOK] Atividade {activity_id} j� foi processada")
             return
         
         # Criar registro de dados fitness
@@ -846,27 +868,27 @@ def process_strava_activity_webhook(athlete_id, activity_id):
         )
         
         session.add(fitness_data)
-        print(f"💾 [WEBHOOK] Dados de fitness salvos")
+        print(f"[DB] [WEBHOOK] Dados de fitness salvos")
         
-        # ⚡ VERIFICAR DESAFIOS IMEDIATAMENTE ⚡
-        print(f"🏆 [WEBHOOK] Verificando desafios para usuário {connection.user_id}...")
+        # [FAST] VERIFICAR DESAFIOS IMEDIATAMENTE [FAST]
+        print(f"[TROPHY] [WEBHOOK] Verificando desafios para usu�rio {connection.user_id}...")
         completed_challenges = check_challenge_completion_webhook(session, connection.user_id, fitness_data)
         
         session.commit()
         
         # Notificar se completou algum desafio
         if completed_challenges:
-            print(f"🎉 [WEBHOOK] 🏆 DESAFIOS COMPLETADOS: {len(completed_challenges)} 🏆")
+            print(f"[CELEBRATE] [WEBHOOK] [TROPHY] DESAFIOS COMPLETADOS: {len(completed_challenges)} [TROPHY]")
             for completion in completed_challenges:
-                print(f"🏆 [WEBHOOK] ✨ PARABÉNS! Desafio completado:")
-                print(f"    🎯 Desafio: {completion['challenge_title']}")
-                print(f"    💰 Prêmio: R$ {completion['prize_amount']:.2f}")
-                print(f"    ⏰ Concluído em: {completion.get('completed_at', 'Agora')}")
+                print(f"[TROPHY] [WEBHOOK] [SPARKLE] PARAB�NS! Desafio completado:")
+                print(f"    [TARGET] Desafio: {completion['challenge_title']}")
+                print(f"    [MONEY] Pr�mio: R$ {completion['prize_amount']:.2f}")
+                print(f"    [TIME] Conclu�do em: {completion.get('completed_at', 'Agora')}")
         else:
-            print(f"📊 [WEBHOOK] Nenhum desafio completado desta vez")
+            print(f"[CHART] [WEBHOOK] Nenhum desafio completado desta vez")
         
     except Exception as e:
-        print(f"❌ [WEBHOOK] Erro crítico processando atividade: {e}")
+        print(f"[ERROR] [WEBHOOK] Erro cr�tico processando atividade: {e}")
         import traceback
         traceback.print_exc()
         session.rollback()
@@ -874,57 +896,57 @@ def process_strava_activity_webhook(athlete_id, activity_id):
         session.close()
 
 def check_challenge_completion_webhook(session, user_id, fitness_data):
-    """Verificar conclusão de desafios via webhook (tempo real)"""
+    """Verificar conclus�o de desafios via webhook (tempo real)"""
     completions = []
     
-    # Buscar participações ativas do usuário
+    # Buscar participa��es ativas do usu�rio
     participations = session.query(ChallengeParticipation).filter_by(
         user_id=user_id,
         status='active'
     ).all()
     
-    print(f"🔍 [WEBHOOK] Encontradas {len(participations)} participações ativas")
+    print(f"[SEARCH] [WEBHOOK] Encontradas {len(participations)} participa��es ativas")
     
     for participation in participations:
         challenge = session.query(Challenge).filter_by(id=participation.challenge_id).first()
         
         if not challenge or challenge.status != 'active':
-            print(f"⚠️ [WEBHOOK] Desafio {participation.challenge_id} não está ativo")
+            print(f"[WARNING] [WEBHOOK] Desafio {participation.challenge_id} n�o est� ativo")
             continue
         
-        print(f"🎯 [WEBHOOK] Verificando desafio: {challenge.title}")
-        print(f"📊 [WEBHOOK] Meta: {challenge.target_value} {challenge.target_metric}")
-        print(f"📊 [WEBHOOK] Atividade: {fitness_data.value} {fitness_data.data_type}")
+        print(f"[TARGET] [WEBHOOK] Verificando desafio: {challenge.title}")
+        print(f"[CHART] [WEBHOOK] Meta: {challenge.target_value} {challenge.target_metric}")
+        print(f"[CHART] [WEBHOOK] Atividade: {fitness_data.value} {fitness_data.data_type}")
         
-        # ⚡ Verificar se a atividade completa o desafio ⚡
+        # [FAST] Verificar se a atividade completa o desafio [FAST]
         if (challenge.target_metric == fitness_data.data_type and 
             fitness_data.value >= challenge.target_value):
             
-            print(f"🏆 [WEBHOOK] 🎉 DESAFIO COMPLETADO! 🎉")
+            print(f"[TROPHY] [WEBHOOK] [CELEBRATE] DESAFIO COMPLETADO! [CELEBRATE]")
             
-            # Marcar participação como completada
+            # Marcar participa��o como completada
             participation.status = 'completed'
             participation.completed_at = datetime.utcnow()
             participation.result_value = fitness_data.value
             
-            # Calcular e creditar prêmio
+            # Calcular e creditar pr�mio
             prize_amount = calculate_prize(session, challenge)
             
-            # Atualizar carteira do usuário
+            # Atualizar carteira do usu�rio
             wallet = session.query(Wallet).filter_by(user_id=user_id).first()
             if wallet:
                 old_balance = wallet.balance
                 wallet.balance += prize_amount
                 wallet.updated_at = datetime.utcnow()
-                print(f"💰 [WEBHOOK] Carteira atualizada:")
-                print(f"    💰 Saldo anterior: R$ {old_balance:.2f}")
-                print(f"    💰 Prêmio: R$ {prize_amount:.2f}")
-                print(f"    💰 Novo saldo: R$ {wallet.balance:.2f}")
+                print(f"[MONEY] [WEBHOOK] Carteira atualizada:")
+                print(f"    [MONEY] Saldo anterior: R$ {old_balance:.2f}")
+                print(f"    [MONEY] Pr�mio: R$ {prize_amount:.2f}")
+                print(f"    [MONEY] Novo saldo: R$ {wallet.balance:.2f}")
             
             # Finalizar desafio (primeiro a completar vence)
             challenge.status = 'completed'
             challenge.updated_at = datetime.utcnow()
-            print(f"🏁 [WEBHOOK] Desafio '{challenge.title}' finalizado!")
+            print(f"[FINISH] [WEBHOOK] Desafio '{challenge.title}' finalizado!")
             
             completions.append({
                 'challenge_id': challenge.id,
@@ -939,19 +961,19 @@ def check_challenge_completion_webhook(session, user_id, fitness_data):
 @app.route('/api/admin/settings/<section>/<key>', methods=['GET', 'PUT', 'OPTIONS'])
 @cross_origin(origins=["http://localhost:3000", "http://localhost:5173", "http://localhost:8080", "http://192.168.1.69:8080", "http://localhost:5174", "http://localhost:5001"])
 def handle_single_setting(section, key):
-    """Gerenciar uma configuração específica"""
+    """Gerenciar uma configura��o espec�fica"""
     if request.method == 'OPTIONS':
         return '', 200
     
     try:
         if request.method == 'GET':
-            # Buscar configuração específica
+            # Buscar configura��o espec�fica
             value = settings_manager.get(section, key)
             
             if value is None:
                 return jsonify({
                     'success': False,
-                    'error': f'Configuração {section}.{key} não encontrada'
+                    'error': f'Configura��o {section}.{key} n�o encontrada'
                 }), 404
             
             return jsonify({
@@ -962,13 +984,13 @@ def handle_single_setting(section, key):
             }), 200
             
         elif request.method == 'PUT':
-            # Atualizar configuração específica
+            # Atualizar configura��o espec�fica
             data = request.get_json()
             
             if 'value' not in data:
                 return jsonify({
                     'success': False,
-                    'error': 'Valor não fornecido'
+                    'error': 'Valor n�o fornecido'
                 }), 400
             
             success = settings_manager.update_single(section, key, data['value'])
@@ -976,7 +998,7 @@ def handle_single_setting(section, key):
             if success:
                 return jsonify({
                     'success': True,
-                    'message': f'Configuração {section}.{key} atualizada com sucesso',
+                    'message': f'Configura��o {section}.{key} atualizada com sucesso',
                     'section': section,
                     'key': key,
                     'value': data['value']
@@ -984,64 +1006,64 @@ def handle_single_setting(section, key):
             else:
                 return jsonify({
                     'success': False,
-                    'error': f'Falha ao atualizar configuração {section}.{key}'
+                    'error': f'Falha ao atualizar configura��o {section}.{key}'
                 }), 400
             
     except Exception as e:
-        logging.error(f"Erro ao gerenciar configuração {section}.{key}: {str(e)}")
+        logging.error(f"Erro ao gerenciar configura��o {section}.{key}: {str(e)}")
         return jsonify({
             'success': False,
             'error': 'Erro interno do servidor'
         }), 500
 
-# ================== HELPER FUNCTIONS PARA CONFIGURAÇÕES ==================
+# ================== HELPER FUNCTIONS PARA CONFIGURA��ES ==================
 
 def get_setting(section: str, key: str, default=None):
-    """Função helper para usar em outras partes do código"""
+    """Fun��o helper para usar em outras partes do c�digo"""
     return settings_manager.get(section, key, default)
 
 def update_setting(section: str, key: str, value):
-    """Função helper para atualizar configurações"""
+    """Fun��o helper para atualizar configura��es"""
     return settings_manager.update_single(section, key, value)
 
 def get_platform_fee():
-    """Helper específico para taxa da plataforma"""
+    """Helper espec�fico para taxa da plataforma"""
     return settings_manager.get('platform', 'platform_fee', 10.0)
 
 def get_min_bet_amount():
-    """Helper específico para valor mínimo de aposta"""
+    """Helper espec�fico para valor m�nimo de aposta"""
     return settings_manager.get('platform', 'min_bet_amount', 5.0)
 
 def get_max_bet_amount():
-    """Helper específico para valor máximo de aposta"""
+    """Helper espec�fico para valor m�ximo de aposta"""
     return settings_manager.get('platform', 'max_bet_amount', 1000.0)
 
 def get_max_participants():
-    """Helper específico para número máximo de participantes"""
+    """Helper espec�fico para n�mero m�ximo de participantes"""
     return settings_manager.get('platform', 'max_participants', 100)
 
 def get_challenge_duration_days():
-    """Helper específico para duração padrão dos desafios"""
+    """Helper espec�fico para dura��o padr�o dos desafios"""
     return settings_manager.get('platform', 'challenge_duration_days', 30)
 
-# ================== EXEMPLO DE USO DAS CONFIGURAÇÕES ==================
+# ================== EXEMPLO DE USO DAS CONFIGURA��ES ==================
 
 def validate_bet_amount(amount):
-    """Validar se o valor da aposta está dentro dos limites configurados"""
+    """Validar se o valor da aposta est� dentro dos limites configurados"""
     min_amount = get_min_bet_amount()
     max_amount = get_max_bet_amount()
     
     if amount < min_amount:
-        return False, f"Valor mínimo de aposta é R$ {min_amount:.2f}"
+        return False, f"Valor m�nimo de aposta � R$ {min_amount:.2f}"
     
     if amount > max_amount:
-        return False, f"Valor máximo de aposta é R$ {max_amount:.2f}"
+        return False, f"Valor m�ximo de aposta � R$ {max_amount:.2f}"
     
-    return True, "Valor válido"
+    return True, "Valor v�lido"
 
 def calculate_platform_fee_amount(bet_amount):
-    """Calcular o valor da taxa da plataforma - VERSÃO DINÂMICA"""
-    fee_percentage = get_dynamic_platform_fee()  # <-- USAR FUNÇÃO DINÂMICA
+    """Calcular o valor da taxa da plataforma - VERS�O DIN�MICA"""
+    fee_percentage = get_dynamic_platform_fee()  # <-- USAR FUN��O DIN�MICA
     return (bet_amount * fee_percentage) / 100
 
 
@@ -1093,12 +1115,12 @@ def initialize_mercadopago():
 
 @app.route('/api/payments/config', methods=['GET', 'OPTIONS'])
 def get_payments_config():
-    """Retorna chave pública do MercadoPago para o frontend"""
+    """Retorna chave p�blica do MercadoPago para o frontend"""
     if request.method == 'OPTIONS':
         return '', 200
         
     try:
-        print("🔍 [CONFIG] Buscando public_key do MercadoPago...")
+        print("[SEARCH] [CONFIG] Buscando public_key do MercadoPago...")
         
         # Buscar as credenciais do banco de dados usando sqlite3 direto
         conn = psycopg2.connect(DATABASE_URL)
@@ -1114,29 +1136,29 @@ def get_payments_config():
         """)
         
         result = cursor.fetchone()
-        print(f"🔍 [CONFIG] Resultado da query: {result}")
+        print(f"[SEARCH] [CONFIG] Resultado da query: {result}")
         
         conn.close()
         
         if not result:
-            print("❌ [CONFIG] Public key não encontrada no banco")
+            print("[ERROR] [CONFIG] Public key n�o encontrada no banco")
             return jsonify({
                 'success': False,
-                'error': 'Chave pública do MercadoPago não encontrada no banco de dados'
+                'error': 'Chave p�blica do MercadoPago n�o encontrada no banco de dados'
             }), 500
         
         public_key = result[0]
-        print(f"🔍 [CONFIG] Public key encontrada: {public_key[:20]}...")
+        print(f"[SEARCH] [CONFIG] Public key encontrada: {public_key[:20]}...")
         
-        # Verificar se a chave não está vazia
+        # Verificar se a chave n�o est� vazia
         if not public_key:
-            print("❌ [CONFIG] Public key está vazia")
+            print("[ERROR] [CONFIG] Public key est� vazia")
             return jsonify({
                 'success': False,
-                'error': 'Chave pública do MercadoPago está vazia'
+                'error': 'Chave p�blica do MercadoPago est� vazia'
             }), 500
         
-        print(f"✅ [CONFIG] Retornando public key para o frontend")
+        print(f"[OK] [CONFIG] Retornando public key para o frontend")
         return jsonify({
             'success': True,
             'publicKey': public_key,
@@ -1144,7 +1166,7 @@ def get_payments_config():
         }), 200
         
     except Exception as e:
-        print(f"❌ [CONFIG] Erro ao obter configurações: {e}")
+        print(f"[ERROR] [CONFIG] Erro ao obter configura��es: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -1158,20 +1180,20 @@ def create_pix_payment():
         
     session = SessionLocal()
     try:
-        print("🔍 [PIX] Iniciando criação de pagamento PIX...")
+        print("[SEARCH] [PIX] Iniciando cria��o de pagamento PIX...")
         
         initialize_mercadopago()
-        print(f"🔍 [PIX] SDK inicializado: {sdk is not None}")
+        print(f"[SEARCH] [PIX] SDK inicializado: {sdk is not None}")
         
         data = request.get_json()
-        print(f"🔍 [PIX] Dados recebidos: {data}")
+        print(f"[SEARCH] [PIX] Dados recebidos: {data}")
         
         user_id = data.get('user_id')
         amount = float(data.get('amount', 0))
         user_email = data.get('user_email')
         user_name = data.get('user_name', '')
         
-        print(f"🔍 [PIX] User ID: {user_id}, Amount: {amount}, Email: {user_email}")
+        print(f"[SEARCH] [PIX] User ID: {user_id}, Amount: {amount}, Email: {user_email}")
         
         if amount <= 0:
             return jsonify({
@@ -1179,45 +1201,45 @@ def create_pix_payment():
                 'error': 'Valor deve ser maior que zero'
             }), 400
         
-        # CORREÇÃO: Buscar usuário de forma mais flexível
+        # CORRE��O: Buscar usu�rio de forma mais flex�vel
         user = None
         
         # Se user_id for 'current_user' ou similar, tentar buscar por email
         if user_id == 'current_user' or str(user_id).startswith('temp_user_') or not user_id:
             if user_email:
                 user = session.query(User).filter_by(email=user_email).first()
-                print(f"🔍 [PIX] Buscando por email: {user_email}, encontrado: {user is not None}")
+                print(f"[SEARCH] [PIX] Buscando por email: {user_email}, encontrado: {user is not None}")
             
-            # Se não encontrou usuário, usar dados temporários
+            # Se n�o encontrou usu�rio, usar dados tempor�rios
             if not user:
-                print("⚠️ [PIX] Usando dados temporários para criar pagamento")
+                print("[WARNING] [PIX] Usando dados tempor�rios para criar pagamento")
                 user_email = user_email or "usuario.teste@betfit.com"
-                user_name = user_name or "Usuário Teste"
+                user_name = user_name or "Usu�rio Teste"
                 user_first_name = user_name.split()[0] if user_name else "Usuario"
                 user_last_name = " ".join(user_name.split()[1:]) if len(user_name.split()) > 1 else "Teste"
         else:
             # Buscar por ID normalmente
             user = session.query(User).filter_by(id=user_id).first()
         
-        # Se encontrou usuário no banco, usar seus dados
+        # Se encontrou usu�rio no banco, usar seus dados
         if user:
             user_email = user.email
-            user_name = user.name or "Usuário BetFit"
+            user_name = user.name or "Usu�rio BetFit"
             name_parts = user_name.split()
             user_first_name = name_parts[0] if name_parts else "Usuario"
             user_last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else "BetFit"
         
-        # Validar se temos dados mínimos
+        # Validar se temos dados m�nimos
         if not user_email:
-            return jsonify({'success': False, 'error': 'Email é obrigatório'}), 400
+            return jsonify({'success': False, 'error': 'Email � obrigat�rio'}), 400
         
-        # Gerar ID único para referência externa
+        # Gerar ID �nico para refer�ncia externa
         external_reference = str(uuid.uuid4())
         
         # Criar pagamento no MercadoPago
         payment_data = {
             "transaction_amount": amount,
-            "description": f"Depósito BetFit - R$ {amount:.2f}",
+            "description": f"Dep�sito BetFit - R$ {amount:.2f}",
             "payment_method_id": "pix",
             "notification_url": os.getenv('MERCADOPAGO_WEBHOOK_URL', 'https://betfit-api.loca.lt/api/payments/webhook/mercadopago'),
             "external_reference": external_reference,
@@ -1227,15 +1249,15 @@ def create_pix_payment():
                 "last_name": user_last_name,
                 "identification": {
                     "type": "CPF",
-                    "number": "11111111111"  # Use CPF real do usuário quando tiver
+                    "number": "11111111111"  # Use CPF real do usu�rio quando tiver
                 }
             }
         }
         
-        print(f"🔍 [PIX] Enviando dados para MercadoPago: {payment_data}")
+        print(f"[SEARCH] [PIX] Enviando dados para MercadoPago: {payment_data}")
         
         payment_response = sdk.payment().create(payment_data)
-        print(f"🔍 [PIX] Resposta do MercadoPago: {payment_response}")
+        print(f"[SEARCH] [PIX] Resposta do MercadoPago: {payment_response}")
         
         if payment_response["status"] == 201:
             payment = payment_response["response"]
@@ -1243,7 +1265,7 @@ def create_pix_payment():
             # Extrair dados do PIX
             pix_data = payment.get('point_of_interaction', {}).get('transaction_data', {})
             
-            # Salvar no banco somente se temos usuário real
+            # Salvar no banco somente se temos usu�rio real
             transaction_id = str(uuid.uuid4())
             if user:
                 payment_transaction = Transaction(
@@ -1251,14 +1273,14 @@ def create_pix_payment():
                     user_id=user.id,
                     type='deposit',
                     amount=amount,
-                    description=f'Depósito PIX - MercadoPago ID: {payment.get("id")}',
+                    description=f'Dep�sito PIX - MercadoPago ID: {payment.get("id")}',
                     status='pending'
                 )
                 session.add(payment_transaction)
                 session.commit()
-                print(f"💾 [PIX] Transação salva no banco: {transaction_id}")
+                print(f"[DB] [PIX] Transa��o salva no banco: {transaction_id}")
             
-            print(f"✅ [PIX] Pagamento criado com sucesso: {payment.get('id')}")
+            print(f"[OK] [PIX] Pagamento criado com sucesso: {payment.get('id')}")
             
             return jsonify({
                 'success': True,
@@ -1274,12 +1296,12 @@ def create_pix_payment():
             }), 201
         else:
             error_msg = payment_response.get("response", {}).get("message", "Erro desconhecido")
-            print(f"❌ [PIX] Erro na resposta do MercadoPago: {error_msg}")
+            print(f"[ERROR] [PIX] Erro na resposta do MercadoPago: {error_msg}")
             return jsonify({'success': False, 'error': f'Erro ao criar pagamento: {error_msg}'}), 400
             
     except Exception as e:
         session.rollback()
-        print(f"❌ [PIX] Erro geral: {e}")
+        print(f"[ERROR] [PIX] Erro geral: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1289,19 +1311,19 @@ def create_pix_payment():
 
 @app.route('/api/payments/card', methods=['POST', 'OPTIONS'])
 def create_card_payment():
-    """Criar pagamento com Cartão via MercadoPago - VERSÃO DEBUG"""
+    """Criar pagamento com Cart�o via MercadoPago - VERS�O DEBUG"""
     if request.method == 'OPTIONS':
         return '', 200
         
     session = SessionLocal()
     try:
-        print("🔍 [CARD] Iniciando criação de pagamento com cartão...")
+        print("[SEARCH] [CARD] Iniciando cria��o de pagamento com cart�o...")
         
         initialize_mercadopago()
-        print(f"🔍 [CARD] SDK inicializado: {sdk is not None}")
+        print(f"[SEARCH] [CARD] SDK inicializado: {sdk is not None}")
         
         data = request.get_json()
-        print(f"🔍 [CARD] Dados recebidos: {json.dumps(data, indent=2)}")
+        print(f"[SEARCH] [CARD] Dados recebidos: {json.dumps(data, indent=2)}")
         
         user_id = data.get('user_id')
         amount = float(data.get('amount', 0))
@@ -1309,66 +1331,66 @@ def create_card_payment():
         user_name = data.get('user_name', '')
         token = data.get('token')
         installments = int(data.get('installments', 1))
-        description = data.get('description', 'Depósito BetFit')
+        description = data.get('description', 'Dep�sito BetFit')
         
-        print(f"🔍 [CARD] Dados extraídos:")
+        print(f"[SEARCH] [CARD] Dados extra�dos:")
         print(f"  - User ID: {user_id}")
         print(f"  - Amount: {amount}")
         print(f"  - Email: {user_email}")
         print(f"  - Token: {token[:20] if token else 'None'}...")
         
-        # Validações básicas
+        # Valida��es b�sicas
         if amount <= 0:
-            print("❌ [CARD] Erro: Valor deve ser maior que zero")
+            print("[ERROR] [CARD] Erro: Valor deve ser maior que zero")
             return jsonify({'success': False, 'error': 'Valor deve ser maior que zero'}), 400
         
         if not token:
-            print("❌ [CARD] Erro: Token do cartão é obrigatório")
-            return jsonify({'success': False, 'error': 'Token do cartão é obrigatório'}), 400
+            print("[ERROR] [CARD] Erro: Token do cart�o � obrigat�rio")
+            return jsonify({'success': False, 'error': 'Token do cart�o � obrigat�rio'}), 400
         
         payment_method_id = "visa"
         
-        # Buscar usuário com debug detalhado
+        # Buscar usu�rio com debug detalhado
         user = None
-        print(f"🔍 [CARD] Iniciando busca do usuário...")
+        print(f"[SEARCH] [CARD] Iniciando busca do usu�rio...")
         
         if user_id == 'current_user' or str(user_id).startswith('temp_user_') or not user_id:
-            print(f"🔍 [CARD] Buscando usuário por email: {user_email}")
+            print(f"[SEARCH] [CARD] Buscando usu�rio por email: {user_email}")
             if user_email:
                 try:
                     user = session.query(User).filter_by(email=user_email).first()
-                    print(f"🔍 [CARD] Resultado da busca por email: {user is not None}")
+                    print(f"[SEARCH] [CARD] Resultado da busca por email: {user is not None}")
                     if user:
-                        print(f"🔍 [CARD] Usuário encontrado - ID: {user.id}, Nome: {user.name}")
+                        print(f"[SEARCH] [CARD] Usu�rio encontrado - ID: {user.id}, Nome: {user.name}")
                 except Exception as e:
-                    print(f"❌ [CARD] Erro ao buscar usuário por email: {e}")
+                    print(f"[ERROR] [CARD] Erro ao buscar usu�rio por email: {e}")
             
             if not user:
-                print("⚠️ [CARD] Usuário não encontrado, usando dados temporários")
+                print("[WARNING] [CARD] Usu�rio n�o encontrado, usando dados tempor�rios")
                 user_email = user_email or "usuario.teste@betfit.com"
                 user_name = user_name or "APRO"
         else:
-            print(f"🔍 [CARD] Buscando usuário por ID: {user_id}")
+            print(f"[SEARCH] [CARD] Buscando usu�rio por ID: {user_id}")
             try:
                 user = session.query(User).filter_by(id=user_id).first()
-                print(f"🔍 [CARD] Resultado da busca por ID: {user is not None}")
+                print(f"[SEARCH] [CARD] Resultado da busca por ID: {user is not None}")
             except Exception as e:
-                print(f"❌ [CARD] Erro ao buscar usuário por ID: {e}")
+                print(f"[ERROR] [CARD] Erro ao buscar usu�rio por ID: {e}")
         
         if user:
             user_email = user.email
             user_name = user.name or "APRO"
-            print(f"✅ [CARD] Usando dados do usuário do banco - Email: {user_email}")
+            print(f"[OK] [CARD] Usando dados do usu�rio do banco - Email: {user_email}")
         else:
-            print(f"⚠️ [CARD] Usando dados temporários - Email: {user_email}")
+            print(f"[WARNING] [CARD] Usando dados tempor�rios - Email: {user_email}")
         
         if not user_email:
-            print("❌ [CARD] Email é obrigatório")
-            return jsonify({'success': False, 'error': 'Email é obrigatório'}), 400
+            print("[ERROR] [CARD] Email � obrigat�rio")
+            return jsonify({'success': False, 'error': 'Email � obrigat�rio'}), 400
         
-        # Gerar referência externa única
+        # Gerar refer�ncia externa �nica
         external_reference = f"BETFIT_CARD_{int(time.time())}_{str(uuid.uuid4())[:8]}"
-        print(f"🔍 [CARD] Referência externa gerada: {external_reference}")
+        print(f"[SEARCH] [CARD] Refer�ncia externa gerada: {external_reference}")
         
         # Dados para MercadoPago
         payment_data = {
@@ -1384,16 +1406,16 @@ def create_card_payment():
             }
         }
         
-        print(f"🔍 [CARD] Enviando para MercadoPago:")
+        print(f"[SEARCH] [CARD] Enviando para MercadoPago:")
         print(f"  - Amount: {payment_data['transaction_amount']}")
         print(f"  - Email: {payment_data['payer']['email']}")
         print(f"  - Reference: {payment_data['external_reference']}")
         
         # Criar pagamento no MercadoPago
-        print("🔍 [CARD] Chamando API do MercadoPago...")
+        print("[SEARCH] [CARD] Chamando API do MercadoPago...")
         payment_response = sdk.payment().create(payment_data)
-        print(f"🔍 [CARD] Status da resposta: {payment_response.get('status')}")
-        print(f"🔍 [CARD] Resposta completa: {json.dumps(payment_response, indent=2)}")
+        print(f"[SEARCH] [CARD] Status da resposta: {payment_response.get('status')}")
+        print(f"[SEARCH] [CARD] Resposta completa: {json.dumps(payment_response, indent=2)}")
         
         # Verificar resposta
         if payment_response.get("status") == 201:
@@ -1401,18 +1423,18 @@ def create_card_payment():
             mercadopago_id = payment.get('id')
             payment_status = payment.get('status')
             
-            print(f"✅ [CARD] Pagamento criado no MercadoPago:")
+            print(f"[OK] [CARD] Pagamento criado no MercadoPago:")
             print(f"  - ID: {mercadopago_id}")
             print(f"  - Status: {payment_status}")
             print(f"  - Amount: {payment.get('transaction_amount')}")
             
-            # ===== SALVAR TRANSAÇÃO NO BANCO =====
-            print("💾 [CARD] Iniciando salvamento da transação no banco...")
+            # ===== SALVAR TRANSA��O NO BANCO =====
+            print("[DB] [CARD] Iniciando salvamento da transa��o no banco...")
             
             transaction_id = str(uuid.uuid4())
-            transaction_description = f'Depósito Cartão - MercadoPago ID: {mercadopago_id}'
+            transaction_description = f'Dep�sito Cart�o - MercadoPago ID: {mercadopago_id}'
             
-            print(f"💾 [CARD] Dados da transação:")
+            print(f"[DB] [CARD] Dados da transa��o:")
             print(f"  - ID: {transaction_id}")
             print(f"  - User ID: {user.id if user else 'None'}")
             print(f"  - Amount: {amount}")
@@ -1421,7 +1443,7 @@ def create_card_payment():
             
             if user:
                 try:
-                    print("💾 [CARD] Criando objeto Transaction...")
+                    print("[DB] [CARD] Criando objeto Transaction...")
                     payment_transaction = Transaction(
                         id=transaction_id,
                         user_id=user.id,
@@ -1431,19 +1453,19 @@ def create_card_payment():
                         status='completed' if payment_status == 'approved' else 'pending'
                     )
                     
-                    print("💾 [CARD] Adicionando transação à sessão...")
+                    print("[DB] [CARD] Adicionando transa��o � sess�o...")
                     session.add(payment_transaction)
                     
-                    print("💾 [CARD] Fazendo flush para verificar erros...")
-                    session.flush()  # Verifica se há erros sem fazer commit
+                    print("[DB] [CARD] Fazendo flush para verificar erros...")
+                    session.flush()  # Verifica se h� erros sem fazer commit
                     
                     # Se aprovado imediatamente, creditar saldo
                     if payment_status == 'approved':
-                        print("💰 [CARD] Pagamento aprovado, creditando saldo...")
+                        print("[MONEY] [CARD] Pagamento aprovado, creditando saldo...")
                         
                         wallet = session.query(Wallet).filter_by(user_id=user.id).first()
                         if not wallet:
-                            print("💼 [CARD] Carteira não existe, criando nova...")
+                            print("[WALLET] [CARD] Carteira n�o existe, criando nova...")
                             wallet = Wallet(
                                 id=str(uuid.uuid4()),
                                 user_id=user.id,
@@ -1460,34 +1482,34 @@ def create_card_payment():
                         wallet.available = float(wallet.available or 0.0) + amount
                         wallet.updated_at = datetime.utcnow()
                         
-                        print(f"💰 [CARD] Saldo atualizado: {old_balance} → {wallet.balance}")
+                        print(f"[MONEY] [CARD] Saldo atualizado: {old_balance} -> {wallet.balance}")
                     
-                    print("💾 [CARD] Fazendo commit final...")
+                    print("[DB] [CARD] Fazendo commit final...")
                     session.commit()
-                    print(f"✅ [CARD] Transação salva com sucesso no banco: {transaction_id}")
+                    print(f"[OK] [CARD] Transa��o salva com sucesso no banco: {transaction_id}")
                     
                     # VERIFICAR SE REALMENTE FOI SALVO
-                    print("🔍 [CARD] Verificando se a transação foi realmente salva...")
+                    print("[SEARCH] [CARD] Verificando se a transa��o foi realmente salva...")
                     saved_transaction = session.query(Transaction).filter_by(id=transaction_id).first()
                     if saved_transaction:
-                        print(f"✅ [CARD] Confirmado: Transação encontrada no banco")
+                        print(f"[OK] [CARD] Confirmado: Transa��o encontrada no banco")
                         print(f"  - ID: {saved_transaction.id}")
                         print(f"  - Description: {saved_transaction.description}")
                         print(f"  - Status: {saved_transaction.status}")
                     else:
-                        print(f"❌ [CARD] ERRO: Transação não encontrada no banco após commit!")
+                        print(f"[ERROR] [CARD] ERRO: Transa��o n�o encontrada no banco ap�s commit!")
                     
                 except Exception as e:
                     session.rollback()
-                    print(f"❌ [CARD] ERRO ao salvar transação: {e}")
-                    print(f"❌ [CARD] Tipo do erro: {type(e)}")
+                    print(f"[ERROR] [CARD] ERRO ao salvar transa��o: {e}")
+                    print(f"[ERROR] [CARD] Tipo do erro: {type(e)}")
                     import traceback
-                    print(f"❌ [CARD] Stack trace completo:")
+                    print(f"[ERROR] [CARD] Stack trace completo:")
                     traceback.print_exc()
                     
                     # Tentar salvar novamente com menos campos
                     try:
-                        print("🔄 [CARD] Tentando salvar com campos mínimos...")
+                        print("[SYNC] [CARD] Tentando salvar com campos m�nimos...")
                         simple_transaction = Transaction(
                             id=str(uuid.uuid4()),
                             user_id=user.id,
@@ -1498,12 +1520,12 @@ def create_card_payment():
                         )
                         session.add(simple_transaction)
                         session.commit()
-                        print("✅ [CARD] Transação simples salva com sucesso")
+                        print("[OK] [CARD] Transa��o simples salva com sucesso")
                         transaction_id = simple_transaction.id
                     except Exception as e2:
-                        print(f"❌ [CARD] Erro na tentativa simples também: {e2}")
+                        print(f"[ERROR] [CARD] Erro na tentativa simples tamb�m: {e2}")
             else:
-                print("⚠️ [CARD] Usuário não encontrado, não salvando transação no banco")
+                print("[WARNING] [CARD] Usu�rio n�o encontrado, n�o salvando transa��o no banco")
             
             return jsonify({
                 'success': True,
@@ -1531,7 +1553,7 @@ def create_card_payment():
             error_info = payment_response.get("response", {})
             error_msg = error_info.get("message", "Erro desconhecido")
             
-            print(f"❌ [CARD] Erro do MercadoPago:")
+            print(f"[ERROR] [CARD] Erro do MercadoPago:")
             print(f"  - Status: {payment_response.get('status')}")
             print(f"  - Error: {error_msg}")
             print(f"  - Details: {json.dumps(error_info, indent=2)}")
@@ -1544,10 +1566,10 @@ def create_card_payment():
             
     except Exception as e:
         session.rollback()
-        print(f"❌ [CARD] ERRO GERAL CRÍTICO: {e}")
-        print(f"❌ [CARD] Tipo: {type(e)}")
+        print(f"[ERROR] [CARD] ERRO GERAL CR�TICO: {e}")
+        print(f"[ERROR] [CARD] Tipo: {type(e)}")
         import traceback
-        print("❌ [CARD] Stack trace completo:")
+        print("[ERROR] [CARD] Stack trace completo:")
         traceback.print_exc()
         return jsonify({
             'success': False, 
@@ -1556,24 +1578,24 @@ def create_card_payment():
     finally:
         try:
             session.close()
-            print("🔍 [CARD] Sessão do banco fechada")
+            print("[SEARCH] [CARD] Sess�o do banco fechada")
         except:
             pass
 
 
-# ENDPOINT PARA VERIFICAR TRANSAÇÕES NO BANCO
+# ENDPOINT PARA VERIFICAR TRANSA��ES NO BANCO
 @app.route('/api/debug/check-transactions', methods=['GET'])
 def debug_check_transactions():
-    """Verificar todas as transações no banco"""
+    """Verificar todas as transa��es no banco"""
     session = SessionLocal()
     try:
-        print("🔍 [DEBUG] Verificando todas as transações no banco...")
+        print("[SEARCH] [DEBUG] Verificando todas as transa��es no banco...")
         
-        # Contar total de transações
+        # Contar total de transa��es
         total_count = session.query(Transaction).count()
-        print(f"🔍 [DEBUG] Total de transações no banco: {total_count}")
+        print(f"[SEARCH] [DEBUG] Total de transa��es no banco: {total_count}")
         
-        # Buscar últimas 10 transações
+        # Buscar �ltimas 10 transa��es
         recent_transactions = session.query(Transaction).order_by(Transaction.created_at.desc()).limit(10).all()
         
         transactions_data = []
@@ -1597,27 +1619,27 @@ def debug_check_transactions():
         })
         
     except Exception as e:
-        print(f"❌ [DEBUG] Erro ao verificar transações: {e}")
+        print(f"[ERROR] [DEBUG] Erro ao verificar transa��es: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
     finally:
         session.close()
 
 
 
-# CORREÇÃO ADICIONAL: Função para obter métodos de pagamento disponíveis
+# CORRE��O ADICIONAL: Fun��o para obter m�todos de pagamento dispon�veis
 @app.route('/api/payments/methods', methods=['GET'])
 def get_payment_methods():
-    """Obter métodos de pagamento disponíveis"""
+    """Obter m�todos de pagamento dispon�veis"""
     try:
         initialize_mercadopago()
         
-        # Buscar métodos de pagamento disponíveis
+        # Buscar m�todos de pagamento dispon�veis
         payment_methods_response = sdk.payment_method().list_all()
         
         if payment_methods_response["status"] == 200:
             methods = payment_methods_response["response"]
             
-            # Filtrar apenas cartões de crédito e débito
+            # Filtrar apenas cart�es de cr�dito e d�bito
             card_methods = [
                 {
                     "id": method["id"],
@@ -1639,11 +1661,11 @@ def get_payment_methods():
         else:
             return jsonify({
                 'success': False,
-                'error': 'Erro ao buscar métodos de pagamento'
+                'error': 'Erro ao buscar m�todos de pagamento'
             }), 400
             
     except Exception as e:
-        print(f"❌ [METHODS] Erro: {e}")
+        print(f"[ERROR] [METHODS] Erro: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -1678,7 +1700,7 @@ def check_payment_status(payment_id):
         else:
             return jsonify({
                 'success': False,
-                'error': 'Pagamento não encontrado no MercadoPago'
+                'error': 'Pagamento n�o encontrado no MercadoPago'
             }), 404
 
     except Exception as e:
@@ -1690,7 +1712,7 @@ def check_payment_status(payment_id):
 
 @app.route('/api/payments/webhook/mercadopago', methods=['POST', 'OPTIONS'])
 def mercadopago_webhook():
-    """Webhook para receber notificações do MercadoPago - VERSÃO CORRIGIDA SEM DUPLICAÇÃO"""
+    """Webhook para receber notifica��es do MercadoPago - VERS�O CORRIGIDA SEM DUPLICA��O"""
     if request.method == 'OPTIONS':
         return '', 200
         
@@ -1703,7 +1725,7 @@ def mercadopago_webhook():
         print(f"Data: {json.dumps(data, indent=2)}")
         print("=" * 50)
         
-        # Verificar se é notificação de pagamento
+        # Verificar se � notifica��o de pagamento
         if data.get('type') == 'payment':
             payment_id = data.get('data', {}).get('id')
             
@@ -1722,19 +1744,19 @@ def mercadopago_webhook():
                     
                     print(f"Payment Status: {status}")
                     
-                    # CORREÇÃO: Verificar se a transação JÁ foi processada no webhook
+                    # CORRE��O: Verificar se a transa��o J� foi processada no webhook
                     transaction = session.query(Transaction).filter(
                         Transaction.description.contains(f'MercadoPago ID: {payment_id}')
                     ).first()
                     
                     if transaction:
-                        # VERIFICAÇÃO CRÍTICA: Se a transação já está 'completed', NÃO processar novamente
+                        # VERIFICA��O CR�TICA: Se a transa��o j� est� 'completed', N�O processar novamente
                         if transaction.status == 'completed' and status == 'approved':
-                            print(f"⚠️ [WEBHOOK] Transação {payment_id} já foi processada e está 'completed'. Ignorando duplicação.")
+                            print(f"[WARNING] [WEBHOOK] Transa��o {payment_id} j� foi processada e est� 'completed'. Ignorando duplica��o.")
                             return jsonify({'status': 'already_processed'}), 200
                         
-                        # VERIFICAÇÃO CRÍTICA: Se o saldo já foi creditado, NÃO creditar novamente
-                        # Vamos verificar se já existe uma transação de prêmio para este pagamento
+                        # VERIFICA��O CR�TICA: Se o saldo j� foi creditado, N�O creditar novamente
+                        # Vamos verificar se j� existe uma transa��o de pr�mio para este pagamento
                         existing_credit = session.query(Transaction).filter(
                             Transaction.description.contains(f'MercadoPago ID: {payment_id}'),
                             Transaction.user_id == transaction.user_id,
@@ -1743,26 +1765,26 @@ def mercadopago_webhook():
                         ).count()
                         
                         if existing_credit > 0 and status == 'approved':
-                            print(f"⚠️ [WEBHOOK] Saldo para payment_id {payment_id} já foi creditado. Ignorando.")
+                            print(f"[WARNING] [WEBHOOK] Saldo para payment_id {payment_id} j� foi creditado. Ignorando.")
                             return jsonify({'status': 'balance_already_credited'}), 200
                         
                         # Se chegou aqui, pode atualizar o status sem creditar saldo
                         if status == 'approved':
                             transaction.status = 'completed'
-                            print(f"🔄 [WEBHOOK] Status atualizado para 'completed' (SEM creditar saldo - já foi creditado)")
+                            print(f"[SYNC] [WEBHOOK] Status atualizado para 'completed' (SEM creditar saldo - j� foi creditado)")
                         elif status in ['rejected', 'cancelled']:
                             transaction.status = 'failed'
-                            print(f"🔄 [WEBHOOK] Status atualizado para 'failed'")
+                            print(f"[SYNC] [WEBHOOK] Status atualizado para 'failed'")
                         
                         session.commit()
-                        print(f"✅ [WEBHOOK] Status da transação atualizado: {status}")
+                        print(f"[OK] [WEBHOOK] Status da transa��o atualizado: {status}")
                     else:
-                        print(f"❌ [WEBHOOK] Transação não encontrada para payment_id: {payment_id}")
+                        print(f"[ERROR] [WEBHOOK] Transa��o n�o encontrada para payment_id: {payment_id}")
                     
         return jsonify({'status': 'ok'}), 200
         
     except Exception as e:
-        print(f"❌ [WEBHOOK] Erro no webhook: {e}")
+        print(f"[ERROR] [WEBHOOK] Erro no webhook: {e}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
     finally:
         session.close()
@@ -1771,14 +1793,14 @@ def mercadopago_webhook():
 
 @app.route('/api/admin/challenges/participations', methods=['GET'])
 def get_challenges_with_participations():
-    """Endpoint que retorna desafios com contagem correta de participações"""
+    """Endpoint que retorna desafios com contagem correta de participa��es"""
     try:
         session = SessionLocal()
         
         # Buscar todos os desafios
         challenges = session.query(Challenge).all()
         
-        # Buscar participações por desafio usando GROUP BY
+        # Buscar participa��es por desafio usando GROUP BY
         from sqlalchemy import func
         participations_query = session.query(
             ChallengeParticipation.challenge_id,
@@ -1786,7 +1808,7 @@ def get_challenges_with_participations():
             func.sum(ChallengeParticipation.stake_amount).label('total_pool')
         ).group_by(ChallengeParticipation.challenge_id).all()
         
-        # Criar dicionário de participações por challenge_id
+        # Criar dicion�rio de participa��es por challenge_id
         participations_map = {}
         for p in participations_query:
             participations_map[p.challenge_id] = {
@@ -1794,7 +1816,7 @@ def get_challenges_with_participations():
                 'total_pool': float(p.total_pool) if p.total_pool else 0.0
             }
         
-        print(f"🔍 [ADMIN] Participações por desafio: {participations_map}")
+        print(f"[SEARCH] [ADMIN] Participa��es por desafio: {participations_map}")
         
         # Montar resposta com dados corretos
         challenges_data = []
@@ -1821,7 +1843,7 @@ def get_challenges_with_participations():
                     'created_at': challenge.created_at.isoformat() if challenge.created_at else None
                 }
             
-            # Adicionar dados de participação corretos
+            # Adicionar dados de participa��o corretos
             challenge_dict.update({
                 'participants_count': participation_data['participants_count'],
                 'current_participants': participation_data['participants_count'],
@@ -1830,7 +1852,7 @@ def get_challenges_with_participations():
             
             challenges_data.append(challenge_dict)
             
-            print(f"✅ [ADMIN] Desafio {challenge.title}: {participation_data['participants_count']} participantes")
+            print(f"[OK] [ADMIN] Desafio {challenge.title}: {participation_data['participants_count']} participantes")
         
         session.close()
         
@@ -1838,7 +1860,7 @@ def get_challenges_with_participations():
         total_participants = sum(c['participants_count'] for c in challenges_data)
         total_pool = sum(c['total_pool'] for c in challenges_data)
         
-        print(f"📊 [ADMIN] Total: {total_participants} participantes, R$ {total_pool:.2f} em pools")
+        print(f"[CHART] [ADMIN] Total: {total_participants} participantes, R$ {total_pool:.2f} em pools")
         
         return jsonify({
             'success': True,
@@ -1846,11 +1868,11 @@ def get_challenges_with_participations():
             'total_challenges': len(challenges_data),
             'total_participants': total_participants,
             'total_pool': total_pool,
-            'message': f'{len(challenges_data)} desafios encontrados com {total_participants} participações'
+            'message': f'{len(challenges_data)} desafios encontrados com {total_participants} participa��es'
         })
         
     except Exception as e:
-        print(f"❌ [ADMIN] Erro ao buscar desafios com participações: {e}")
+        print(f"[ERROR] [ADMIN] Erro ao buscar desafios com participa��es: {e}")
         import traceback
         traceback.print_exc()
         
@@ -1866,20 +1888,20 @@ def get_challenges_with_participations():
 
 @app.route('/api/challenges/<challenge_id>/join', methods=['OPTIONS'])
 def join_challenge_options(challenge_id):
-    """Handler para requisições OPTIONS do endpoint join"""
+    """Handler para requisi��es OPTIONS do endpoint join"""
     return '', 200
     
 
 @app.route('/api/challenges/<challenge_id>/complete', methods=['OPTIONS'])
 def complete_challenge_options(challenge_id):
-    """Handler para requisições OPTIONS do endpoint complete"""
+    """Handler para requisi��es OPTIONS do endpoint complete"""
     return '', 200
 
-# <<< ATENÇÃO: A rota foi alterada para aceitar IDs de texto, como 'challenge_001' >>>
+# <<< ATEN��O: A rota foi alterada para aceitar IDs de texto, como 'challenge_001' >>>
 @app.route('/api/challenges/<challenge_id>/join', methods=['POST'])
 def join_challenge(challenge_id):
     """
-    Endpoint para participar de um desafio - COM TAXA DINÂMICA
+    Endpoint para participar de um desafio - COM TAXA DIN�MICA
     """
     session = SessionLocal()
     try:
@@ -1887,15 +1909,15 @@ def join_challenge(challenge_id):
         user_email = data.get('email') or data.get('user_email')
         stake_amount = float(data.get('stake_amount', 0))
 
-        print(f"🎯 [JOIN] {user_email} tentando participar do desafio '{challenge_id}' com R$ {stake_amount:.2f}")
+        print(f"[TARGET] [JOIN] {user_email} tentando participar do desafio '{challenge_id}' com R$ {stake_amount:.2f}")
 
         if not user_email or stake_amount <= 0:
-            return jsonify({'success': False, 'error': 'Email e valor da aposta válidos são obrigatórios'}), 400
+            return jsonify({'success': False, 'error': 'Email e valor da aposta v�lidos s�o obrigat�rios'}), 400
 
-        # 1. Buscar usuário e carteira com SQLAlchemy
+        # 1. Buscar usu�rio e carteira com SQLAlchemy
         user = session.query(User).filter(User.email == user_email).first()
         if not user:
-            return jsonify({'success': False, 'error': 'Usuário não encontrado'}), 404
+            return jsonify({'success': False, 'error': 'Usu�rio n�o encontrado'}), 404
         
         wallet = session.query(Wallet).filter(Wallet.user_id == user.id).first()
         if not wallet or wallet.balance < stake_amount:
@@ -1905,27 +1927,27 @@ def join_challenge(challenge_id):
         # 2. Buscar desafio com SQLAlchemy
         challenge = session.query(Challenge).filter(Challenge.id == challenge_id).first()
         if not challenge:
-            return jsonify({'success': False, 'error': 'Desafio não encontrado'}), 404
+            return jsonify({'success': False, 'error': 'Desafio n�o encontrado'}), 404
 
-        # 3. Verificar se já participa com SQLAlchemy
+        # 3. Verificar se j� participa com SQLAlchemy
         existing_participation = session.query(ChallengeParticipation).filter_by(user_id=user.id, challenge_id=challenge.id).first()
         if existing_participation:
-            return jsonify({'success': False, 'error': 'Você já está participando deste desafio'}), 400
+            return jsonify({'success': False, 'error': 'Voc� j� est� participando deste desafio'}), 400
         
-        # 4. BUSCAR TAXA DINÂMICA PARA MOSTRAR AO USUÁRIO
+        # 4. BUSCAR TAXA DIN�MICA PARA MOSTRAR AO USU�RIO
         current_platform_fee = get_dynamic_platform_fee()
         fee_amount = stake_amount * (current_platform_fee / 100)
         net_contribution = stake_amount - fee_amount
         
-        print(f"💰 [JOIN] Taxa atual: {current_platform_fee}% (R$ {fee_amount:.2f} de taxa, R$ {net_contribution:.2f} para o pool)")
+        print(f"[MONEY] [JOIN] Taxa atual: {current_platform_fee}% (R$ {fee_amount:.2f} de taxa, R$ {net_contribution:.2f} para o pool)")
         
-        # 5. Executar as transações de forma segura.
+        # 5. Executar as transa��es de forma segura.
         
         # Debitar da carteira
         wallet.balance -= stake_amount
         wallet.available -= stake_amount
         
-        # Criar registro de participação
+        # Criar registro de participa��o
         participation = ChallengeParticipation(
             id=str(uuid.uuid4()),
             challenge_id=challenge.id,
@@ -1935,7 +1957,7 @@ def join_challenge(challenge_id):
         )
         session.add(participation)
         
-        # Criar transação de débito
+        # Criar transa��o de d�bito
         transaction = Transaction(
             id=str(uuid.uuid4()),
             user_id=user.id,
@@ -1946,21 +1968,21 @@ def join_challenge(challenge_id):
         )
         session.add(transaction)
         
-        # Atualizar contagem de apostas do usuário
+        # Atualizar contagem de apostas do usu�rio
         user.total_bets = (user.total_bets or 0) + 1
         
         # Atualizar contagem de participantes e pool do desafio
         challenge.current_participants = (challenge.current_participants or 0) + 1
         challenge.total_pool = (challenge.total_pool or 0) + stake_amount
         
-        # Salva todas as alterações no banco de dados de uma só vez
+        # Salva todas as altera��es no banco de dados de uma s� vez
         session.commit()
         
-        print(f"✅ [JOIN] Sucesso! {user_email} entrou no desafio '{challenge.title}'. Novo saldo: R$ {wallet.balance:.2f}")
+        print(f"[OK] [JOIN] Sucesso! {user_email} entrou no desafio '{challenge.title}'. Novo saldo: R$ {wallet.balance:.2f}")
         
         return jsonify({
             'success': True,
-            'message': 'Participação registrada com sucesso!',
+            'message': 'Participa��o registrada com sucesso!',
             'data': {
                 'participation_id': participation.id,
                 'new_balance': wallet.balance,
@@ -1977,13 +1999,13 @@ def join_challenge(challenge_id):
         }), 201
             
     except sqlite3.Error as e:
-        print(f"❌ [JOIN] Erro no banco de dados: {e}")
+        print(f"[ERROR] [JOIN] Erro no banco de dados: {e}")
         return jsonify({'success': False, 'error': f'Erro no banco de dados: {str(e)}'}), 500
         
     except Exception as e:
-        print(f"❌ [JOIN] Erro geral: {e}")
+        print(f"[ERROR] [JOIN] Erro geral: {e}")
         import traceback
-        print(f"❌ [JOIN] Stack trace: {traceback.format_exc()}")
+        print(f"[ERROR] [JOIN] Stack trace: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': f'Erro interno: {str(e)}'}), 500
 
 
@@ -2002,7 +2024,7 @@ def get_current_platform_fee():
         }), 200
         
     except Exception as e:
-        print(f"❌ [FEE] Erro ao buscar taxa: {e}")
+        print(f"[ERROR] [FEE] Erro ao buscar taxa: {e}")
         return jsonify({
             'success': False,
             'error': str(e),
@@ -2025,7 +2047,7 @@ def get_challenges_activity():
         for i in range(min(limit, 10)):
             activities.append({
                 "id": i + 1,
-                "user_name": f"Usuário {i + 1}",
+                "user_name": f"Usu�rio {i + 1}",
                 "action": "completou um desafio",
                 "challenge_title": f"Desafio {i + 1}",
                 "timestamp": datetime.now().isoformat()
@@ -2040,15 +2062,15 @@ def get_challenges_activity():
         return jsonify({"error": str(e)}), 500
 
 
-# ===== CORREÇÃO: HANDLER OPTIONS PARA ADMIN =====
+# ===== CORRE��O: HANDLER OPTIONS PARA ADMIN =====
 @app.route('/api/admin/dashboard/metrics', methods=['OPTIONS'])
 def admin_dashboard_metrics_options():
-    """Handler para requisições OPTIONS do endpoint admin"""
+    """Handler para requisi��es OPTIONS do endpoint admin"""
     return '', 200
 
 @app.route('/', methods=['GET'])
 def root():
-    """Rota raiz da API - informações básicas"""
+    """Rota raiz da API - informa��es b�sicas"""
     return jsonify({
         "api": "BetFit Backend",
         "version": "1.0.0",
@@ -2070,7 +2092,7 @@ def root():
             "data": "/api/fitness/data",
             "link_healthkit": "/api/fitness/link-healthkit"
         },
-        "message": "BetFit API está funcionando corretamente!"
+        "message": "BetFit API est� funcionando corretamente!"
     })
 # ==================== UTILITY FUNCTIONS ====================
 
@@ -2125,24 +2147,24 @@ def model_tx_to_dict(t):
 
 
 # ========================================================================
-# <<< NOVA FUNÇÃO PARA POPULAR O BANCO DE DADOS (PASSO 3) >>>
+# <<< NOVA FUN��O PARA POPULAR O BANCO DE DADOS (PASSO 3) >>>
 # ========================================================================
 @app.route('/api/dev/seed-database', methods=['GET'])
 def seed_database():
     """
     Endpoint de desenvolvimento para recriar e popular o banco com dados de teste.
-    Apaga as tabelas inteiras (DROP TABLE) e começa do zero.
+    Apaga as tabelas inteiras (DROP TABLE) e come�a do zero.
     """
     from sqlalchemy import text
     
     session = SessionLocal()
     try:
-        print("🔥 [SEED] RESET TOTAL DO BANCO DE DADOS...")
+        print("[FIRE] [SEED] RESET TOTAL DO BANCO DE DADOS...")
         
         # Pega a engine do SQLAlchemy para executar comandos
         engine = session.get_bind()
 
-        # Desativa a verificação de chaves estrangeiras
+        # Desativa a verifica��o de chaves estrangeiras
         session.execute(text('PRAGMA foreign_keys=OFF;'))
 
         # Apaga todas as tabelas conhecidas pelo `models.py`
@@ -2154,18 +2176,18 @@ def seed_database():
         print("   - Recriando todas as tabelas...")
         Base.metadata.create_all(engine)
         
-        # Reativa a verificação de chaves estrangeiras
+        # Reativa a verifica��o de chaves estrangeiras
         session.execute(text('PRAGMA foreign_keys=ON;'))
         
         session.commit()
         
-        print("🌱 [SEED] Populando o banco de dados com dados de teste limpos...")
+        print("[BILLIARD] [SEED] Populando o banco de dados com dados de teste limpos...")
 
-        # --- A lógica para criar usuários e desafios permanece a mesma ---
+        # --- A l�gica para criar usu�rios e desafios permanece a mesma ---
         user_id_teste = str(uuid.uuid4())
         user1 = User(
             id=user_id_teste,
-            name='Usuário Teste',
+            name='Usu�rio Teste',
             email='teste@betfit.com',
             password=hash_password('123456'),
             status='active',
@@ -2194,14 +2216,14 @@ def seed_database():
         session.add_all(challenges_to_create)
 
         session.commit()
-        print("✅ [SEED] Banco de dados recriado e populado com sucesso!")
+        print("[OK] [SEED] Banco de dados recriado e populado com sucesso!")
 
-        return jsonify({"message": "Banco de dados recriado e populado com 1 usuário e 4 desafios."}), 201
+        return jsonify({"message": "Banco de dados recriado e populado com 1 usu�rio e 4 desafios."}), 201
 
     except Exception as e:
         session.rollback()
         import traceback
-        print(f"❌ [SEED] Erro ao recriar o banco: {e}")
+        print(f"[ERROR] [SEED] Erro ao recriar o banco: {e}")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
     finally:
@@ -2213,29 +2235,29 @@ def seed_database():
 
 @app.route('/api/auth/register', methods=['POST'])
 def register():
-    """Registro de usuário com persistência real no banco"""
+    """Registro de usu�rio com persist�ncia real no banco"""
     session = SessionLocal()
     try:
         data = request.get_json()
         
-        print(f"🔍 [REGISTRO] Iniciando processo de registro...")
-        print(f"🔍 [REGISTRO] Dados recebidos: {data}")
+        print(f"[SEARCH] [REGISTRO] Iniciando processo de registro...")
+        print(f"[SEARCH] [REGISTRO] Dados recebidos: {data}")
         
-        # Validar dados obrigatórios
+        # Validar dados obrigat�rios
         required_fields = ['name', 'email', 'password']
         for field in required_fields:
             if not data.get(field):
-                return jsonify({'error': f'Campo {field} é obrigatório'}), 400
+                return jsonify({'error': f'Campo {field} � obrigat�rio'}), 400
         
-        # Verificar se email já existe
-        print(f"🔍 [REGISTRO] Verificando se email {data['email']} já existe...")
+        # Verificar se email j� existe
+        print(f"[SEARCH] [REGISTRO] Verificando se email {data['email']} j� existe...")
         existing_user = session.query(User).filter_by(email=data['email']).first()
         if existing_user:
-            print(f"❌ [REGISTRO] Email já existe: {data['email']}")
-            return jsonify({'error': 'Email já cadastrado'}), 400
-        print(f"✅ [REGISTRO] Email disponível: {data['email']}")
+            print(f"[ERROR] [REGISTRO] Email j� existe: {data['email']}")
+            return jsonify({'error': 'Email j� cadastrado'}), 400
+        print(f"[OK] [REGISTRO] Email dispon�vel: {data['email']}")
         
-        # Criar novo usuário
+        # Criar novo usu�rio
         user_id = str(uuid.uuid4())
         user = User(
             id=user_id,
@@ -2248,11 +2270,11 @@ def register():
         )
         
         session.add(user)
-        print(f"🔍 [REGISTRO] Usuário adicionado à sessão: {user.email}")
+        print(f"[SEARCH] [REGISTRO] Usu�rio adicionado � sess�o: {user.email}")
         session.commit()
-        print(f"✅ [REGISTRO] Usuário commitado no banco: {user.id}")
+        print(f"[OK] [REGISTRO] Usu�rio commitado no banco: {user.id}")
         
-        # Criar carteira para o usuário com bônus de boas-vindas
+        # Criar carteira para o usu�rio com b�nus de boas-vindas
         wallet = Wallet(
             id=str(uuid.uuid4()),
             user_id=user_id,
@@ -2262,22 +2284,22 @@ def register():
             currency='BRL'
         )
         session.add(wallet)
-        print(f"🔍 [REGISTRO] Carteira adicionada à sessão para usuário: {user_id}")
+        print(f"[SEARCH] [REGISTRO] Carteira adicionada � sess�o para usu�rio: {user_id}")
         session.commit()
-        print(f"✅ [REGISTRO] Carteira commitada no banco com saldo: R$ {wallet.balance}")
+        print(f"[OK] [REGISTRO] Carteira commitada no banco com saldo: R$ {wallet.balance}")
         
-        # Adicionar transação de bônus de boas-vindas
+        # Adicionar transa��o de b�nus de boas-vindas
         bonus_transaction = Transaction(
             id=str(uuid.uuid4()),
             user_id=user_id,
             type='bonus',
             amount=50.0,
-            description='Bônus de boas-vindas',
+            description='B�nus de boas-vindas',
             status='completed'
         )
         session.add(bonus_transaction)
         session.commit()
-        print(f"✅ [REGISTRO] Transação de bônus adicionada")
+        print(f"[OK] [REGISTRO] Transa��o de b�nus adicionada")
         
         # Gerar token de acesso
         access_token = secrets.token_hex(16)
@@ -2300,10 +2322,10 @@ def register():
             "currency": wallet.currency
         }
         
-        print(f"✅ [REGISTRO] Novo usuário registrado: {user.email} (ID: {user_id})")
+        print(f"[OK] [REGISTRO] Novo usu�rio registrado: {user.email} (ID: {user_id})")
         
         return jsonify({
-            'message': 'Usuário registrado com sucesso! Bônus de R$ 50,00 adicionado à carteira.',
+            'message': 'Usu�rio registrado com sucesso! B�nus de R$ 50,00 adicionado � carteira.',
             'user': user_response,
             'wallet': wallet_response,
             'access_token': access_token
@@ -2311,17 +2333,17 @@ def register():
     
     except Exception as e:
         session.rollback()
-        print(f"❌ [REGISTRO] ERRO DETALHADO: {e}")
-        print(f"❌ [REGISTRO] Tipo do erro: {type(e)}")
+        print(f"[ERROR] [REGISTRO] ERRO DETALHADO: {e}")
+        print(f"[ERROR] [REGISTRO] Tipo do erro: {type(e)}")
         import traceback
-        print(f"❌ [REGISTRO] Stack trace: {traceback.format_exc()}")
+        print(f"[ERROR] [REGISTRO] Stack trace: {traceback.format_exc()}")
         return jsonify({'error': 'Erro interno do servidor'}), 500
     finally:
         session.close()
 
 @app.route('/api/auth/login', methods=['POST'])
 def login():
-    """Login de usuário"""
+    """Login de usu�rio"""
     session = SessionLocal()
     try:
         data = request.get_json()
@@ -2329,28 +2351,28 @@ def login():
         password = data.get('password')
 
         if not email or not password:
-            return jsonify({'error': 'Email e senha são obrigatórios'}), 400
+            return jsonify({'error': 'Email e senha s�o obrigat�rios'}), 400
 
-        print(f"🔐 [LOGIN] Tentativa de login: {email}")
+        print(f"[LOCK] [LOGIN] Tentativa de login: {email}")
 
-        # Buscar usuário no banco
+        # Buscar usu�rio no banco
         user = session.query(User).filter_by(email=email).first()
         if not user:
-            print(f"❌ [LOGIN] Usuário não encontrado: {email}")
-            return jsonify({'error': 'Usuário não encontrado'}), 404
+            print(f"[ERROR] [LOGIN] Usu�rio n�o encontrado: {email}")
+            return jsonify({'error': 'Usu�rio n�o encontrado'}), 404
 
         # Validar senha com hash
         hashed_password = hash_password(password)
         if user.password != hashed_password:
-            print(f"❌ [LOGIN] Senha incorreta para: {email}")
+            print(f"[ERROR] [LOGIN] Senha incorreta para: {email}")
             return jsonify({'error': 'Senha incorreta'}), 401
 
         # Verificar status
         if user.status != 'active':
-            print(f"❌ [LOGIN] Usuário bloqueado: {email}")
-            return jsonify({'error': 'Usuário bloqueado'}), 403
+            print(f"[ERROR] [LOGIN] Usu�rio bloqueado: {email}")
+            return jsonify({'error': 'Usu�rio bloqueado'}), 403
 
-        # Atualizar último login
+        # Atualizar �ltimo login
         user.last_login = datetime.utcnow()
         session.commit()
 
@@ -2383,7 +2405,7 @@ def login():
             "last_login": user.last_login.isoformat() if user.last_login else None
         }
 
-        print(f"✅ [LOGIN] Login realizado com sucesso: {email}")
+        print(f"[OK] [LOGIN] Login realizado com sucesso: {email}")
 
         return jsonify({
             'message': 'Login realizado com sucesso',
@@ -2394,7 +2416,7 @@ def login():
 
     except Exception as e:
         session.rollback()
-        print(f"❌ [LOGIN] Erro no login: {e}")
+        print(f"[ERROR] [LOGIN] Erro no login: {e}")
         return jsonify({'error': 'Erro interno do servidor'}), 500
     finally:
         session.close()
@@ -2406,19 +2428,19 @@ def get_wallet_by_email(email):
     """Busca dados da carteira por email - DADOS REAIS DO BANCO"""
     session = SessionLocal()
     try:
-        print(f"💰 [WALLET] Buscando carteira para: {email}")
+        print(f"[MONEY] [WALLET] Buscando carteira para: {email}")
         
-        # Buscar usuário por email
+        # Buscar usu�rio por email
         user = session.query(User).filter_by(email=email).first()
         if not user:
-            print(f"❌ [WALLET] Usuário não encontrado: {email}")
-            return jsonify({"error": "Usuário não encontrado"}), 404
+            print(f"[ERROR] [WALLET] Usu�rio n�o encontrado: {email}")
+            return jsonify({"error": "Usu�rio n�o encontrado"}), 404
         
-        # Buscar carteira do usuário
+        # Buscar carteira do usu�rio
         wallet = session.query(Wallet).filter_by(user_id=user.id).first()
         if not wallet:
-            print(f"⚠️ [WALLET] Carteira não encontrada, criando...")
-            # Criar carteira se não existir
+            print(f"[WARNING] [WALLET] Carteira n�o encontrada, criando...")
+            # Criar carteira se n�o existir
             wallet = Wallet(
                 id=str(uuid.uuid4()),
                 user_id=user.id,
@@ -2430,7 +2452,7 @@ def get_wallet_by_email(email):
             session.add(wallet)
             session.commit()
         
-        # Buscar transações
+        # Buscar transa��es
         transactions = session.query(Transaction).filter_by(user_id=user.id).order_by(Transaction.created_at.desc()).limit(10).all()
         
         transactions_list = []
@@ -2457,11 +2479,11 @@ def get_wallet_by_email(email):
             "last_updated": wallet.updated_at.isoformat() if wallet.updated_at else datetime.utcnow().isoformat()
         }
         
-        print(f"✅ [WALLET] Carteira encontrada: R$ {wallet_data['balance']:.2f}")
+        print(f"[OK] [WALLET] Carteira encontrada: R$ {wallet_data['balance']:.2f}")
         return jsonify(wallet_data)
         
     except Exception as e:
-        print(f"❌ [WALLET] Erro ao buscar carteira: {e}")
+        print(f"[ERROR] [WALLET] Erro ao buscar carteira: {e}")
         return jsonify({"error": f"Erro ao buscar carteira: {str(e)}"}), 500
     finally:
         session.close()
@@ -2472,12 +2494,12 @@ def get_wallet_by_query():
     try:
         email = request.args.get('email')
         if not email:
-            return jsonify({"error": "Email é obrigatório"}), 400
+            return jsonify({"error": "Email � obrigat�rio"}), 400
             
         return get_wallet_by_email(email)
         
     except Exception as e:
-        print(f"❌ [WALLET] Erro ao buscar carteira: {e}")
+        print(f"[ERROR] [WALLET] Erro ao buscar carteira: {e}")
         return jsonify({"error": f"Erro ao buscar carteira: {str(e)}"}), 500
 
 @app.route('/api/wallet/balance', methods=['GET'])
@@ -2487,14 +2509,14 @@ def get_wallet_balance():
     try:
         email = request.args.get('email')
         if not email:
-            return jsonify({"error": "Email é obrigatório"}), 400
+            return jsonify({"error": "Email � obrigat�rio"}), 400
             
-        print(f"💰 [BALANCE] Buscando saldo para: {email}")
+        print(f"[MONEY] [BALANCE] Buscando saldo para: {email}")
         
-        # Buscar usuário
+        # Buscar usu�rio
         user = session.query(User).filter_by(email=email).first()
         if not user:
-            return jsonify({"error": "Usuário não encontrado"}), 404
+            return jsonify({"error": "Usu�rio n�o encontrado"}), 404
         
         # Buscar carteira
         wallet = session.query(Wallet).filter_by(user_id=user.id).first()
@@ -2516,7 +2538,7 @@ def get_wallet_balance():
         return jsonify(balance_data)
         
     except Exception as e:
-        print(f"❌ [BALANCE] Erro ao buscar saldo: {e}")
+        print(f"[ERROR] [BALANCE] Erro ao buscar saldo: {e}")
         return jsonify({"error": f"Erro ao buscar saldo: {str(e)}"}), 500
     finally:
         session.close()
@@ -2525,20 +2547,20 @@ def get_wallet_balance():
 
 @app.route('/api/user/profile', methods=['GET'])
 def get_user_profile():
-    """Busca perfil do usuário - DADOS REAIS DO BANCO"""
+    """Busca perfil do usu�rio - DADOS REAIS DO BANCO"""
     session = SessionLocal()
     try:
         email = request.args.get('email')
         if not email:
-            return jsonify({"error": "Email é obrigatório"}), 400
+            return jsonify({"error": "Email � obrigat�rio"}), 400
             
-        print(f"👤 [PROFILE] Buscando perfil para: {email}")
+        print(f"[USER] [PROFILE] Buscando perfil para: {email}")
         
-        # Buscar usuário
+        # Buscar usu�rio
         user = session.query(User).filter_by(email=email).first()
         if not user:
-            print(f"❌ [PROFILE] Usuário não encontrado: {email}")
-            return jsonify({"error": "Usuário não encontrado"}), 404
+            print(f"[ERROR] [PROFILE] Usu�rio n�o encontrado: {email}")
+            return jsonify({"error": "Usu�rio n�o encontrado"}), 404
         
         # Buscar carteira
         wallet = session.query(Wallet).filter_by(user_id=user.id).first()
@@ -2574,32 +2596,32 @@ def get_user_profile():
             }
         }
         
-        print(f"✅ [PROFILE] Perfil encontrado: {user.name} - R$ {profile_data['profile']['wallet']['balance']:.2f}")
+        print(f"[OK] [PROFILE] Perfil encontrado: {user.name} - R$ {profile_data['profile']['wallet']['balance']:.2f}")
         return jsonify(profile_data)
         
     except Exception as e:
-        print(f"❌ [PROFILE] Erro ao buscar perfil: {e}")
+        print(f"[ERROR] [PROFILE] Erro ao buscar perfil: {e}")
         return jsonify({"error": f"Erro ao buscar perfil: {str(e)}"}), 500
     finally:
         session.close()
 
 @app.route('/api/test/user/<email>', methods=['GET'])
 def test_user_api(email):
-    """Endpoint de teste para dados do usuário - DADOS REAIS DO BANCO"""
+    """Endpoint de teste para dados do usu�rio - DADOS REAIS DO BANCO"""
     session = SessionLocal()
     try:
-        print(f"🧪 [TEST] Test User API para: {email}")
+        print(f"[FIST] [TEST] Test User API para: {email}")
         
-        # Buscar usuário real
+        # Buscar usu�rio real
         user = session.query(User).filter_by(email=email).first()
         if not user:
-            print(f"❌ [TEST] Usuário não encontrado: {email}")
-            return jsonify({"error": "Usuário não encontrado"}), 404
+            print(f"[ERROR] [TEST] Usu�rio n�o encontrado: {email}")
+            return jsonify({"error": "Usu�rio n�o encontrado"}), 404
         
         # Buscar carteira real
         wallet = session.query(Wallet).filter_by(user_id=user.id).first()
         
-        # Buscar transações reais
+        # Buscar transa��es reais
         transactions = session.query(Transaction).filter_by(user_id=user.id).order_by(Transaction.created_at.desc()).limit(5).all()
         
         test_data = {
@@ -2639,12 +2661,12 @@ def test_user_api(email):
             }
         }
         
-        print(f"✅ [TEST] Dados do usuário {email} coletados com sucesso")
+        print(f"[OK] [TEST] Dados do usu�rio {email} coletados com sucesso")
         return jsonify(test_data)
         
     except Exception as e:
-        print(f"❌ [TEST] Erro ao buscar dados do usuário: {e}")
-        return jsonify({"error": f"Erro ao buscar dados do usuário: {str(e)}"}), 500
+        print(f"[ERROR] [TEST] Erro ao buscar dados do usu�rio: {e}")
+        return jsonify({"error": f"Erro ao buscar dados do usu�rio: {str(e)}"}), 500
     finally:
         session.close()
 
@@ -2658,30 +2680,30 @@ def test_user_api(email):
 def connect_test_device():
     """
     NOVO ENDPOINT: Conectar dispositivo de teste (mock) e registrar no banco
-    Este é o endpoint que estava faltando no código original!
+    Este � o endpoint que estava faltando no c�digo original!
     """
     session = SessionLocal()
     try:
         data = request.get_json()
         
         if not data:
-            return jsonify({'error': 'Dados não fornecidos'}), 400
+            return jsonify({'error': 'Dados n�o fornecidos'}), 400
         
         user_email = data.get('user_email')
         platform = data.get('platform', 'teste')
         device_id = data.get('device_id')
         
         if not user_email or not device_id:
-            return jsonify({'error': 'user_email e device_id são obrigatórios'}), 400
+            return jsonify({'error': 'user_email e device_id s�o obrigat�rios'}), 400
         
-        print(f"🧪 [FITNESS-TEST] Conectando dispositivo teste para: {user_email}")
+        print(f"[FIST] [FITNESS-TEST] Conectando dispositivo teste para: {user_email}")
         
-        # Verificar se usuário existe
+        # Verificar se usu�rio existe
         user = session.query(User).filter_by(email=user_email).first()
         if not user:
-            return jsonify({'error': 'Usuário não encontrado'}), 404
+            return jsonify({'error': 'Usu�rio n�o encontrado'}), 404
         
-        # Verificar se já existe uma conexão ativa para este usuário e plataforma
+        # Verificar se j� existe uma conex�o ativa para este usu�rio e plataforma
         existing_connection = session.query(FitnessConnection).filter_by(
             user_id=user.id, 
             platform=platform,
@@ -2689,11 +2711,11 @@ def connect_test_device():
         ).first()
         
         if existing_connection:
-            return jsonify({'error': 'Dispositivo de teste já conectado para este usuário'}), 409
+            return jsonify({'error': 'Dispositivo de teste j� conectado para este usu�rio'}), 409
         
-        # Criar nova conexão de teste
+        # Criar nova conex�o de teste
         permissions = json.dumps(data.get('permissions', ['mock_activities', 'mock_challenges']))
-        # O campo 'metadata' foi removido porque a coluna não existe na tabela
+        # O campo 'metadata' foi removido porque a coluna n�o existe na tabela
 
         new_connection = FitnessConnection(
             user_id=user.id,
@@ -2714,7 +2736,7 @@ def connect_test_device():
         connection_dict['permissions'] = json.loads(connection_dict.get('permissions', '[]'))
         connection_dict['mock_data'] = json.loads(connection_dict.get('metadata', '{}'))
         
-        print(f"✅ [FITNESS-TEST] Dispositivo teste conectado com ID: {new_connection.id}")
+        print(f"[OK] [FITNESS-TEST] Dispositivo teste conectado com ID: {new_connection.id}")
         
         return jsonify({
             'success': True,
@@ -2724,7 +2746,7 @@ def connect_test_device():
         
     except Exception as e:
         session.rollback()
-        print(f"❌ [FITNESS-TEST] Erro ao conectar dispositivo teste: {e}")
+        print(f"[ERROR] [FITNESS-TEST] Erro ao conectar dispositivo teste: {e}")
         return jsonify({'error': str(e)}), 500
     finally:
         session.close()
@@ -2732,14 +2754,14 @@ def connect_test_device():
 @app.route('/api/fitness/mock-activity', methods=['POST'])
 def register_mock_activity():
     """
-    ENDPOINT ATUALIZADO: Registar atividade mock, verificar desafios e atribuir prémios.
+    ENDPOINT ATUALIZADO: Registar atividade mock, verificar desafios e atribuir pr�mios.
     """
     session = SessionLocal()
     try:
         data = request.get_json()
         
         if not data:
-            return jsonify({'error': 'Dados da atividade não fornecidos'}), 400
+            return jsonify({'error': 'Dados da atividade n�o fornecidos'}), 400
         
         user_email = data.get('user_email')
         platform = data.get('platform', 'teste')
@@ -2749,17 +2771,17 @@ def register_mock_activity():
         timestamp_str = data.get('timestamp', datetime.utcnow().isoformat())
         
         if not all([user_email, activity_type, distance, duration]):
-            return jsonify({'error': 'Campos obrigatórios: user_email, activity_type, distance, duration'}), 400
+            return jsonify({'error': 'Campos obrigat�rios: user_email, activity_type, distance, duration'}), 400
         
-        print(f"🏃 [FITNESS-MOCK] Registrando atividade mock para: {user_email}")
+        print(f"[RUN] [FITNESS-MOCK] Registrando atividade mock para: {user_email}")
         
         user = session.query(User).filter_by(email=user_email).first()
         if not user:
-            return jsonify({'error': 'Usuário não encontrado'}), 404
+            return jsonify({'error': 'Usu�rio n�o encontrado'}), 404
         
         connection = session.query(FitnessConnection).filter_by(user_id=user.id, platform=platform, is_active=True).first()
         if not connection:
-            return jsonify({'error': 'Nenhuma conexão de teste ativa encontrada'}), 404
+            return jsonify({'error': 'Nenhuma conex�o de teste ativa encontrada'}), 404
         
         # 1. Registar a atividade de fitness (como antes)
         start_time = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
@@ -2780,42 +2802,42 @@ def register_mock_activity():
         session.add(fitness_data)
         
         connection.last_sync = datetime.utcnow()
-        print(f"✅ [FITNESS-MOCK] Atividade registrada: {activity_type} - {distance}km em {duration}min")
+        print(f"[OK] [FITNESS-MOCK] Atividade registrada: {activity_type} - {distance}km em {duration}min")
 
-        # --- NOVA LÓGICA DE VALIDAÇÃO DE DESAFIOS E PAGAMENTO ---
+        # --- NOVA L�GICA DE VALIDA��O DE DESAFIOS E PAGAMENTO ---
         completed_challenges_info = []
 
-        # 2. Encontrar participações ativas do usuário
+        # 2. Encontrar participa��es ativas do usu�rio
         active_participations = session.query(ChallengeParticipation).filter_by(
             user_id=user.id,
-            status='active' # Apenas desafios em que o usuário está ativamente a participar
+            status='active' # Apenas desafios em que o usu�rio est� ativamente a participar
         ).all()
 
-        print(f"🔍 [VALIDATION] Encontradas {len(active_participations)} participações ativas para {user_email}")
+        print(f"[SEARCH] [VALIDATION] Encontradas {len(active_participations)} participa��es ativas para {user_email}")
 
         for participation in active_participations:
             challenge = session.query(Challenge).filter_by(id=participation.challenge_id).first()
 
             if not challenge or challenge.status != 'active':
-                continue # Pular se o desafio não for encontrado ou não estiver ativo
+                continue # Pular se o desafio n�o for encontrado ou n�o estiver ativo
 
-            print(f"  -> Verificando desafio: '{challenge.title}' (Métrica: {challenge.target_metric}, Alvo: {challenge.target_value} {challenge.target_unit})")
+            print(f"  -> Verificando desafio: '{challenge.title}' (M�trica: {challenge.target_metric}, Alvo: {challenge.target_value} {challenge.target_unit})")
 
-            # 3. Validar se a atividade cumpre os critérios do desafio
+            # 3. Validar se a atividade cumpre os crit�rios do desafio
             is_metric_match = challenge.target_metric == activity_type
             is_value_achieved = float(distance) >= challenge.target_value
 
             if is_metric_match and is_value_achieved:
-                print(f"🏆 [VALIDATION] Desafio '{challenge.title}' COMPLETO!")
+                print(f"[TROPHY] [VALIDATION] Desafio '{challenge.title}' COMPLETO!")
 
-                # 4. Atualizar o estado da participação
+                # 4. Atualizar o estado da participa��o
                 participation.status = 'completed'
                 participation.validation_status = 'validated'
                 participation.completed_at = datetime.utcnow()
                 participation.result_value = float(distance)
 
-                # 5. Calcular e atribuir o prémio
-                # (Lógica de prémio simplificada: o prémio é o dobro da taxa de entrada)
+                # 5. Calcular e atribuir o pr�mio
+                # (L�gica de pr�mio simplificada: o pr�mio � o dobro da taxa de entrada)
                 prize_amount = challenge.entry_fee * 2 
                 
                 wallet = session.query(Wallet).filter_by(user_id=user.id).first()
@@ -2824,18 +2846,18 @@ def register_mock_activity():
                     wallet.available += prize_amount
                     wallet.updated_at = datetime.utcnow()
 
-                    # 6. Criar uma transação para o prémio
+                    # 6. Criar uma transa��o para o pr�mio
                     prize_transaction = Transaction(
                         id=str(uuid.uuid4()),
                         user_id=user.id,
                         type='prize',
                         amount=prize_amount,
-                        description=f'Prémio do desafio: {challenge.title}',
+                        description=f'Pr�mio do desafio: {challenge.title}',
                         status='completed'
                     )
                     session.add(prize_transaction)
                     
-                    print(f"💰 [WALLET] Prémio de R$ {prize_amount:.2f} adicionado à carteira de {user_email}")
+                    print(f"[MONEY] [WALLET] Pr�mio de R$ {prize_amount:.2f} adicionado � carteira de {user_email}")
 
                     completed_challenges_info.append({
                         'challenge_id': challenge.id,
@@ -2843,9 +2865,9 @@ def register_mock_activity():
                         'prize_amount': prize_amount
                     })
                 else:
-                    print(f"⚠️ [WALLET] Carteira não encontrada para {user_email}. Prémio não atribuído.")
+                    print(f"[WARNING] [WALLET] Carteira n�o encontrada para {user_email}. Pr�mio n�o atribu�do.")
 
-        # 7. Fazer commit de todas as alterações no final
+        # 7. Fazer commit de todas as altera��es no final
         session.commit()
         
         return jsonify({
@@ -2859,8 +2881,8 @@ def register_mock_activity():
         
     except Exception as e:
         session.rollback()
-        print(f"❌ [FITNESS-MOCK] Erro ao registrar atividade mock: {e}")
-        # Adicionar mais detalhes ao erro para depuração
+        print(f"[ERROR] [FITNESS-MOCK] Erro ao registrar atividade mock: {e}")
+        # Adicionar mais detalhes ao erro para depura��o
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
@@ -2877,22 +2899,22 @@ def disconnect_fitness_device():
         data = request.get_json()
         
         if not data:
-            return jsonify({'error': 'Dados não fornecidos'}), 400
+            return jsonify({'error': 'Dados n�o fornecidos'}), 400
         
         user_email = data.get('user_email')
         platform = data.get('platform')
         
         if not user_email or not platform:
-            return jsonify({'error': 'user_email e platform são obrigatórios'}), 400
+            return jsonify({'error': 'user_email e platform s�o obrigat�rios'}), 400
         
-        print(f"🔌 [FITNESS-DISCONNECT] Desconectando {platform} para: {user_email}")
+        print(f"[PLUG] [FITNESS-DISCONNECT] Desconectando {platform} para: {user_email}")
         
-        # Verificar se usuário existe
+        # Verificar se usu�rio existe
         user = session.query(User).filter_by(email=user_email).first()
         if not user:
-            return jsonify({'error': 'Usuário não encontrado'}), 404
+            return jsonify({'error': 'Usu�rio n�o encontrado'}), 404
         
-        # Buscar e desativar a conexão
+        # Buscar e desativar a conex�o
         connection = session.query(FitnessConnection).filter_by(
             user_id=user.id,
             platform=platform,
@@ -2900,16 +2922,16 @@ def disconnect_fitness_device():
         ).first()
         
         if not connection:
-            return jsonify({'error': 'Conexão não encontrada'}), 404
+            return jsonify({'error': 'Conex�o n�o encontrada'}), 404
         
-        # Desativar a conexão
+        # Desativar a conex�o
         connection.is_active = False
         connection.sync_status = 'disconnected'
         connection.updated_at = datetime.utcnow()
         
         session.commit()
         
-        print(f"✅ [FITNESS-DISCONNECT] Dispositivo {platform} desconectado")
+        print(f"[OK] [FITNESS-DISCONNECT] Dispositivo {platform} desconectado")
         
         return jsonify({
             'success': True,
@@ -2918,7 +2940,7 @@ def disconnect_fitness_device():
         
     except Exception as e:
         session.rollback()
-        print(f"❌ [FITNESS-DISCONNECT] Erro ao desconectar dispositivo: {e}")
+        print(f"[ERROR] [FITNESS-DISCONNECT] Erro ao desconectar dispositivo: {e}")
         return jsonify({'error': str(e)}), 500
     finally:
         session.close()
@@ -2926,16 +2948,16 @@ def disconnect_fitness_device():
 @app.route('/api/fitness/stats/<user_email>', methods=['GET'])
 def get_fitness_stats(user_email):
     """
-    NOVO ENDPOINT: Obter estatísticas fitness do usuário
+    NOVO ENDPOINT: Obter estat�sticas fitness do usu�rio
     """
     session = SessionLocal()
     try:
-        print(f"📊 [FITNESS-STATS] Buscando estatísticas para: {user_email}")
+        print(f"[CHART] [FITNESS-STATS] Buscando estat�sticas para: {user_email}")
         
-        # Verificar se usuário existe
+        # Verificar se usu�rio existe
         user = session.query(User).filter_by(email=user_email).first()
         if not user:
-            return jsonify({'error': 'Usuário não encontrado'}), 404
+            return jsonify({'error': 'Usu�rio n�o encontrado'}), 404
         
         # Contar atividades por tipo
         from sqlalchemy import func
@@ -2945,7 +2967,7 @@ def get_fitness_stats(user_email):
             func.sum(FitnessData.value).label('total_distance')
         ).filter_by(user_id=user.id).group_by(FitnessData.data_type).all()
         
-        # Contar conexões ativas
+        # Contar conex�es ativas
         active_connections = session.query(FitnessConnection).filter_by(
             user_id=user.id,
             is_active=True
@@ -2969,12 +2991,12 @@ def get_fitness_stats(user_email):
             }
         }
         
-        print(f"✅ [FITNESS-STATS] Estatísticas geradas: {active_connections} conexões, {len(activity_breakdown)} tipos de atividade")
+        print(f"[OK] [FITNESS-STATS] Estat�sticas geradas: {active_connections} conex�es, {len(activity_breakdown)} tipos de atividade")
         
         return jsonify(stats_data), 200
         
     except Exception as e:
-        print(f"❌ [FITNESS-STATS] Erro ao obter estatísticas: {e}")
+        print(f"[ERROR] [FITNESS-STATS] Erro ao obter estat�sticas: {e}")
         return jsonify({'error': str(e)}), 500
     finally:
         session.close()
@@ -2985,30 +3007,30 @@ def get_fitness_stats(user_email):
 @app.route('/api/fitness/connect', methods=['POST'])
 def connect_fitness_app():
     """
-    Endpoint para o APLICATIVO MÓVEL chamar DEPOIS que o usuário
-    autoriza o HealthKit. Ele cria o registro de conexão no banco.
+    Endpoint para o APLICATIVO M�VEL chamar DEPOIS que o usu�rio
+    autoriza o HealthKit. Ele cria o registro de conex�o no banco.
     """
     session = SessionLocal()
     try:
         data = request.get_json()
         user_email = data.get('user_email')
-        platform = data.get('platform') # Deverá ser "apple_health"
+        platform = data.get('platform') # Dever� ser "apple_health"
 
         if not user_email or not platform:
-            return jsonify({'error': 'user_email e platform são obrigatórios'}), 400
+            return jsonify({'error': 'user_email e platform s�o obrigat�rios'}), 400
 
-        print(f"📱 [FITNESS] App móvel solicitando conexão para {user_email} via {platform}")
+        print(f"[PHONE] [FITNESS] App m�vel solicitando conex�o para {user_email} via {platform}")
         user = session.query(User).filter_by(email=user_email).first()
         if not user:
-            return jsonify({'error': 'Usuário não encontrado'}), 404
+            return jsonify({'error': 'Usu�rio n�o encontrado'}), 404
 
-        # Procura por uma conexão existente para não duplicar
+        # Procura por uma conex�o existente para n�o duplicar
         connection = session.query(FitnessConnection).filter_by(user_id=user.id, platform=platform).first()
         if connection:
             connection.is_active = True
             connection.sync_status = 'connected'
             connection.error_message = None
-            print(f"✅ [FITNESS] Conexão reativada para {user_email}")
+            print(f"[OK] [FITNESS] Conex�o reativada para {user_email}")
         else:
             connection = FitnessConnection(
                 user_id=user.id,
@@ -3016,7 +3038,7 @@ def connect_fitness_app():
                 is_active=True
             )
             session.add(connection)
-            print(f"✅ [FITNESS] Nova conexão criada para {user_email}")
+            print(f"[OK] [FITNESS] Nova conex�o criada para {user_email}")
         
         session.commit()
         return jsonify({
@@ -3027,14 +3049,14 @@ def connect_fitness_app():
 
     except Exception as e:
         session.rollback()
-        print(f"❌ [FITNESS] Erro ao conectar: {e}")
+        print(f"[ERROR] [FITNESS] Erro ao conectar: {e}")
         return jsonify({'error': str(e)}), 500
     finally:
         session.close()
 
 @app.route('/api/fitness/link-healthkit', methods=['POST'])
 def link_healthkit():
-    """Endpoint para vincular HealthKit com a conta do usuário"""
+    """Endpoint para vincular HealthKit com a conta do usu�rio"""
     session = SessionLocal()
     try:
         data = request.get_json()
@@ -3043,14 +3065,14 @@ def link_healthkit():
         permissions = data.get('permissions', [])
         
         if not user_email:
-            return jsonify({'error': 'user_email é obrigatório'}), 400
+            return jsonify({'error': 'user_email � obrigat�rio'}), 400
         
-        # Verificar se usuário existe
+        # Verificar se usu�rio existe
         user = session.query(User).filter_by(email=user_email).first()
         if not user:
-            return jsonify({'error': 'Usuário não encontrado'}), 404
+            return jsonify({'error': 'Usu�rio n�o encontrado'}), 404
         
-        # Verificar se já existe uma conexão ativa
+        # Verificar se j� existe uma conex�o ativa
         existing_connection = session.query(FitnessConnection).filter_by(
             user_id=user.id, 
             platform='apple_health',
@@ -3058,14 +3080,14 @@ def link_healthkit():
         ).first()
         
         if existing_connection:
-            # Atualizar conexão existente
+            # Atualizar conex�o existente
             existing_connection.platform_user_id = device_id
             existing_connection.permissions = json.dumps(permissions)
             existing_connection.last_sync = datetime.utcnow()
             existing_connection.updated_at = datetime.utcnow()
             connection = existing_connection
         else:
-            # Criar nova conexão
+            # Criar nova conex�o
             connection = FitnessConnection(
                 user_id=user.id,
                 platform='apple_health',
@@ -3079,7 +3101,7 @@ def link_healthkit():
         
         session.commit()
         
-        print(f"✅ [HEALTHKIT] Conexão vinculada para {user_email}")
+        print(f"[OK] [HEALTHKIT] Conex�o vinculada para {user_email}")
         
         return jsonify({
             'success': True, 
@@ -3089,25 +3111,25 @@ def link_healthkit():
         
     except Exception as e:
         session.rollback()
-        print(f"❌ [HEALTHKIT] Erro ao vincular: {e}")
+        print(f"[ERROR] [HEALTHKIT] Erro ao vincular: {e}")
         return jsonify({'error': str(e)}), 500
     finally:
         session.close()
 
 def check_and_complete_challenges(session, user_id, fitness_data_list):
     """
-    Verifica se os dados de fitness completaram algum desafio ativo do usuário.
+    Verifica se os dados de fitness completaram algum desafio ativo do usu�rio.
     Se sim, completa o desafio automaticamente.
     """
     try:
-        # Buscar participações ativas do usuário
+        # Buscar participa��es ativas do usu�rio
         active_participations = session.query(ChallengeParticipation).filter_by(
             user_id=user_id, 
             status='active'
         ).all()
         
         if not active_participations:
-            return {"message": "Nenhuma participação ativa encontrada", "completed_challenges": []}
+            return {"message": "Nenhuma participa��o ativa encontrada", "completed_challenges": []}
         
         completed_challenges = []
         
@@ -3121,7 +3143,7 @@ def check_and_complete_challenges(session, user_id, fitness_data_list):
             if not challenge or not challenge.auto_validation:
                 continue
             
-            # Verificar se algum dado fitness atende à meta do desafio
+            # Verificar se algum dado fitness atende � meta do desafio
             for fitness_item in fitness_data_list:
                 if meets_challenge_criteria(fitness_item, challenge):
                     # COMPLETAR O DESAFIO
@@ -3137,18 +3159,18 @@ def check_and_complete_challenges(session, user_id, fitness_data_list):
         }
         
     except Exception as e:
-        print(f"❌ Erro na verificação de desafios: {e}")
+        print(f"[ERROR] Erro na verifica��o de desafios: {e}")
         return {"error": str(e), "completed_challenges": []}
 
 def meets_challenge_criteria(fitness_data, challenge):
-    """Verifica se os dados fitness atendem aos critérios do desafio"""
+    """Verifica se os dados fitness atendem aos crit�rios do desafio"""
     try:
         data_type = fitness_data.get('type', '').lower()
         data_value = float(fitness_data.get('value', 0))
         target_value = float(challenge.target_value or 0)
         target_metric = (challenge.target_metric or '').lower()
         
-        # Mapear tipos de dados para métricas do desafio
+        # Mapear tipos de dados para m�tricas do desafio
         type_mapping = {
             'distance': ['distance', 'km', 'running', 'cycling'],
             'steps': ['steps', 'step'],
@@ -3160,22 +3182,22 @@ def meets_challenge_criteria(fitness_data, challenge):
         for metric_group, aliases in type_mapping.items():
             if data_type in aliases or target_metric in aliases:
                 if data_value >= target_value:
-                    print(f"✅ Meta atingida! {data_value} >= {target_value} {challenge.target_unit}")
+                    print(f"[OK] Meta atingida! {data_value} >= {target_value} {challenge.target_unit}")
                     return True
         
         return False
         
     except Exception as e:
-        print(f"❌ Erro ao verificar critérios: {e}")
+        print(f"[ERROR] Erro ao verificar crit�rios: {e}")
         return False
 
 def complete_challenge_automatically(session, challenge, participation, fitness_data):
-    """Completa o desafio automaticamente quando meta é atingida"""
+    """Completa o desafio automaticamente quando meta � atingida"""
     try:
         completion_time = datetime.datetime.utcnow()
         achieved_value = float(fitness_data.get('value', 0))
         
-        # Atualizar participação
+        # Atualizar participa��o
         participation.status = 'completed'
         participation.result_value = achieved_value
         participation.completed_at = completion_time
@@ -3185,7 +3207,7 @@ def complete_challenge_automatically(session, challenge, participation, fitness_
         challenge.status = 'completed'
         challenge.updated_at = completion_time
         
-        # Criar validação automática
+        # Criar valida��o autom�tica
         validation = ChallengeValidation(
             participation_id=participation.id,
             challenge_id=challenge.id,
@@ -3216,7 +3238,7 @@ def complete_challenge_automatically(session, challenge, participation, fitness_
         
         session.commit()
         
-        print(f"🏆 Desafio '{challenge.title}' completado automaticamente por {participation.user_email}")
+        print(f"[TROPHY] Desafio '{challenge.title}' completado automaticamente por {participation.user_email}")
         
         return {
             "challenge_id": challenge.id,
@@ -3230,13 +3252,13 @@ def complete_challenge_automatically(session, challenge, participation, fitness_
         
     except Exception as e:
         session.rollback()
-        print(f"❌ Erro ao completar desafio: {e}")
+        print(f"[ERROR] Erro ao completar desafio: {e}")
         raise e
 
 @app.route('/api/fitness/data', methods=['POST'])
 def receive_fitness_data():
     """
-    Endpoint para o APLICATIVO MÓVEL enviar os dados coletados do HealthKit,
+    Endpoint para o APLICATIVO M�VEL enviar os dados coletados do HealthKit,
     incluindo metadados anti-fraude.
     """
     session = SessionLocal()
@@ -3246,25 +3268,25 @@ def receive_fitness_data():
         fitness_data_list = data.get('data', [])
 
         if not user_email or not fitness_data_list:
-            return jsonify({'error': 'user_email e uma lista de dados são obrigatórios'}), 400
+            return jsonify({'error': 'user_email e uma lista de dados s�o obrigat�rios'}), 400
 
         user = session.query(User).filter_by(email=user_email).first()
         if not user:
-            return jsonify({'error': 'Usuário não encontrado'}), 404
+            return jsonify({'error': 'Usu�rio n�o encontrado'}), 404
 
         connection = session.query(FitnessConnection).filter_by(user_id=user.id, platform='apple_health', is_active=True).first()
         if not connection:
-            return jsonify({'error': 'Nenhuma conexão ativa com apple_health encontrada para este usuário'}), 404
+            return jsonify({'error': 'Nenhuma conex�o ativa com apple_health encontrada para este usu�rio'}), 404
         
         processed_count = 0
         for item in fitness_data_list:
-            # O app móvel deve enviar os metadados dentro de 'raw_data'
+            # O app m�vel deve enviar os metadados dentro de 'raw_data'
             raw_data_str = json.dumps(item.get('raw_data', {}))
             trust_score = calculate_trust_score(raw_data_str)
             
-            # Você pode decidir não salvar dados com score muito baixo
+            # Voc� pode decidir n�o salvar dados com score muito baixo
             if trust_score < 0.2:
-                print(f"⚠️ [ANTI-FRAUDE] Dado descartado para {user_email} por baixo score de confiança ({trust_score}). Fonte manual.")
+                print(f"[WARNING] [ANTI-FRAUDE] Dado descartado para {user_email} por baixo score de confian�a ({trust_score}). Fonte manual.")
                 continue
 
             fitness_record = FitnessData(
@@ -3282,11 +3304,11 @@ def receive_fitness_data():
             session.add(fitness_record)
             processed_count += 1
         
-        # Atualiza a data da última sincronização
+        # Atualiza a data da �ltima sincroniza��o
         connection.last_sync = datetime.utcnow()
         session.commit()
         
-        print(f"✅ [FITNESS] {processed_count} registros de dados de fitness salvos para {user_email}")
+        print(f"[OK] [FITNESS] {processed_count} registros de dados de fitness salvos para {user_email}")
         
         # NOVA PARTE: Verificar se completou algum desafio
         challenge_check = check_and_complete_challenges(session, user.id, fitness_data_list)
@@ -3299,21 +3321,322 @@ def receive_fitness_data():
 
     except Exception as e:
         session.rollback()
-        print(f"❌ [FITNESS] Erro ao receber dados de fitness: {e}")
+        print(f"[ERROR] [FITNESS] Erro ao receber dados de fitness: {e}")
         return jsonify({'error': str(e)}), 500
     finally:
         session.close()
 
+
+# ==================== NOVOS ENDPOINTS FITNESS CRÍTICOS ====================
+
+@app.route('/api/fitness/validate-activity', methods=['POST'])
+def validate_activity():
+    """
+    Valida se uma atividade específica cumpre os requisitos de um desafio.
+    Chamado pelo componente ActivityValidator.jsx do frontend.
+    """
+    session = SessionLocal()
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        activity_id = data.get('activity_id')
+        challenge_id = data.get('challenge_id')
+
+        if not all([user_id, activity_id, challenge_id]):
+            return jsonify({'error': 'user_id, activity_id e challenge_id são obrigatórios'}), 400
+
+        # Buscar desafio
+        challenge = session.query(Challenge).filter_by(id=challenge_id).first()
+        if not challenge:
+            return jsonify({'error': 'Desafio não encontrado'}), 404
+
+        # Buscar participação do usuário
+        participation = session.query(ChallengeParticipation).filter_by(
+            challenge_id=challenge_id,
+            user_id=user_id
+        ).first()
+
+        if not participation:
+            return jsonify({'error': 'Você não está participando deste desafio'}), 400
+
+        # Buscar atividade fitness
+        activity = session.query(FitnessData).filter_by(id=activity_id, user_id=user_id).first()
+        if not activity:
+            return jsonify({'error': 'Atividade não encontrada'}), 404
+
+        # Validar critérios do desafio
+        target_value = float(challenge.target_value or 0)
+        achieved_value = float(activity.value or 0)
+
+        # Calcular score de validação
+        score = min(100, int((achieved_value / target_value) * 100)) if target_value > 0 else 0
+        is_valid = achieved_value >= target_value
+
+        # Critérios detalhados
+        criteria_met = {
+            'distance': achieved_value >= target_value if challenge.target_metric == 'distance' else True,
+            'time_window': True,  # Verificar se atividade está no período do desafio
+            'device_verified': activity.source_app != 'manual_entry'
+        }
+
+        validation_result = {
+            'valid': is_valid,
+            'score': score,
+            'message': f'Meta {"atingida" if is_valid else "não atingida"}! {achieved_value:.1f}/{target_value} {challenge.target_unit}',
+            'criteria_met': criteria_met,
+            'achieved_value': achieved_value,
+            'target_value': target_value
+        }
+
+        # Se válido, atualizar participação
+        if is_valid:
+            participation.result_value = achieved_value
+            participation.status = 'completed'
+            participation.completed_at = datetime.datetime.utcnow()
+            participation.validation_status = 'validated'
+            session.commit()
+
+            print(f"[OK] [VALIDATION] Desafio {challenge_id} completado por {user_id}")
+
+        return jsonify({
+            'success': True,
+            'validation': validation_result
+        }), 200
+
+    except Exception as e:
+        session.rollback()
+        print(f"[ERROR] [VALIDATION] Erro ao validar atividade: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/strava/connect', methods=['GET'])
+def strava_connect():
+    """
+    Inicia o fluxo de conexão OAuth com Strava.
+    Retorna URL de autorização para o usuário.
+    """
+    try:
+        user_email = request.args.get('user_email')
+        if not user_email:
+            return jsonify({'error': 'user_email é obrigatório'}), 400
+
+        # Configurações OAuth do Strava (devem estar no .env)
+        STRAVA_CLIENT_ID = os.getenv('STRAVA_CLIENT_ID', 'YOUR_CLIENT_ID')
+        STRAVA_REDIRECT_URI = os.getenv('STRAVA_REDIRECT_URI', 'http://localhost:5001/api/auth/strava/callback')
+
+        # Gerar state para segurança
+        state = f"{user_email}:{secrets.token_urlsafe(16)}"
+
+        # URL de autorização do Strava
+        authorization_url = (
+            f"https://www.strava.com/oauth/authorize"
+            f"?client_id={STRAVA_CLIENT_ID}"
+            f"&redirect_uri={STRAVA_REDIRECT_URI}"
+            f"&response_type=code"
+            f"&scope=activity:read_all,activity:read"
+            f"&state={state}"
+        )
+
+        print(f"[OK] [STRAVA] URL de autorização gerada para {user_email}")
+
+        return jsonify({
+            'success': True,
+            'authorization_url': authorization_url
+        }), 200
+
+    except Exception as e:
+        print(f"[ERROR] [STRAVA] Erro ao gerar URL: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/fitness/connections/<user_email>', methods=['GET'])
+def get_fitness_connections(user_email):
+    """
+    Lista todas as conexões fitness ativas de um usuário.
+    Usado pelo componente ProfileDevices.jsx
+    """
+    session = SessionLocal()
+    try:
+        # Buscar usuário
+        user = session.query(User).filter_by(email=user_email).first()
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+
+        # Buscar conexões ativas
+        connections = session.query(FitnessConnection).filter_by(
+            user_id=user.id,
+            is_active=True
+        ).all()
+
+        connections_data = []
+        for conn in connections:
+            conn_dict = conn.to_dict() if hasattr(conn, 'to_dict') else {
+                'id': conn.id,
+                'platform': conn.platform,
+                'is_active': conn.is_active,
+                'last_sync': conn.last_sync.isoformat() if conn.last_sync else None,
+                'sync_status': conn.sync_status
+            }
+            connections_data.append(conn_dict)
+
+        print(f"[OK] [CONNECTIONS] {len(connections_data)} conexões encontradas para {user_email}")
+
+        return jsonify({
+            'success': True,
+            'connections': connections_data,
+            'total': len(connections_data)
+        }), 200
+
+    except Exception as e:
+        print(f"[ERROR] [CONNECTIONS] Erro ao buscar conexões: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/challenges/<challenge_id>/finalize', methods=['POST'])
+def finalize_challenge(challenge_id):
+    """
+    Finaliza um desafio e distribui prêmios para os vencedores.
+    Calcula vencedores baseado em winner_type (top_n, all_qualifiers, equal_split).
+    """
+    session = SessionLocal()
+    try:
+        # Buscar desafio
+        challenge = session.query(Challenge).filter_by(id=challenge_id).first()
+        if not challenge:
+            return jsonify({'error': 'Desafio não encontrado'}), 404
+
+        if challenge.status == 'completed':
+            return jsonify({'error': 'Desafio já foi finalizado'}), 400
+
+        # Buscar todas as participações completadas
+        completed_participations = session.query(ChallengeParticipation).filter_by(
+            challenge_id=challenge_id,
+            status='completed'
+        ).order_by(ChallengeParticipation.result_value.desc()).all()
+
+        if not completed_participations:
+            return jsonify({'error': 'Nenhum participante completou este desafio'}), 400
+
+        # Calcular pool de prêmios (total apostado - taxa da plataforma)
+        total_pool = float(challenge.total_pool or 0)
+        platform_fee_percent = float(os.getenv('PLATFORM_FEE', 10))
+        platform_fee_amount = total_pool * (platform_fee_percent / 100)
+        prize_pool = total_pool - platform_fee_amount
+
+        # Determinar vencedores baseado no winner_type
+        winner_type = challenge.winner_type or 'top_n'
+        winners = []
+
+        if winner_type == 'top_n':
+            # Top N vencedores (ex: Top 3)
+            top_n = int(challenge.winner_count or 1)
+            winners = completed_participations[:top_n]
+
+            # Distribuição: 1º lugar 50%, 2º lugar 30%, 3º lugar 20%
+            prize_distribution = [0.5, 0.3, 0.2]
+
+            for idx, participation in enumerate(winners):
+                if idx < len(prize_distribution):
+                    prize_amount = prize_pool * prize_distribution[idx]
+                else:
+                    prize_amount = 0
+
+                # Adicionar prêmio à carteira do usuário
+                user_wallet = session.query(Wallet).filter_by(user_id=participation.user_id).first()
+                if user_wallet:
+                    user_wallet.balance += prize_amount
+
+                    # Criar transação de prêmio
+                    transaction = Transaction(
+                        user_id=participation.user_id,
+                        wallet_id=user_wallet.id,
+                        type='prize',
+                        amount=prize_amount,
+                        status='completed',
+                        description=f'Prêmio do desafio: {challenge.title} (Posição {idx + 1})'
+                    )
+                    session.add(transaction)
+
+                    print(f"[OK] [PRIZE] R$ {prize_amount:.2f} creditado para usuário {participation.user_id} (Posição {idx + 1})")
+
+        elif winner_type == 'all_qualifiers':
+            # Todos que completaram dividem o prêmio
+            winners = completed_participations
+            prize_per_winner = prize_pool / len(winners)
+
+            for participation in winners:
+                user_wallet = session.query(Wallet).filter_by(user_id=participation.user_id).first()
+                if user_wallet:
+                    user_wallet.balance += prize_per_winner
+
+                    transaction = Transaction(
+                        user_id=participation.user_id,
+                        wallet_id=user_wallet.id,
+                        type='prize',
+                        amount=prize_per_winner,
+                        status='completed',
+                        description=f'Prêmio do desafio: {challenge.title} (Divisão igual)'
+                    )
+                    session.add(transaction)
+
+                    print(f"[OK] [PRIZE] R$ {prize_per_winner:.2f} creditado para usuário {participation.user_id}")
+
+        elif winner_type == 'equal_split':
+            # Dividir igualmente entre todos os vencedores
+            winners = completed_participations
+            prize_per_winner = prize_pool / len(winners)
+
+            for participation in winners:
+                user_wallet = session.query(Wallet).filter_by(user_id=participation.user_id).first()
+                if user_wallet:
+                    user_wallet.balance += prize_per_winner
+
+                    transaction = Transaction(
+                        user_id=participation.user_id,
+                        wallet_id=user_wallet.id,
+                        type='prize',
+                        amount=prize_per_winner,
+                        status='completed',
+                        description=f'Prêmio do desafio: {challenge.title}'
+                    )
+                    session.add(transaction)
+
+        # Atualizar status do desafio
+        challenge.status = 'completed'
+        challenge.updated_at = datetime.datetime.utcnow()
+
+        session.commit()
+
+        print(f"[OK] [FINALIZE] Desafio {challenge_id} finalizado com {len(winners)} vencedores")
+
+        return jsonify({
+            'success': True,
+            'message': f'Desafio finalizado com sucesso',
+            'winners_count': len(winners),
+            'prize_pool': prize_pool,
+            'platform_fee': platform_fee_amount
+        }), 200
+
+    except Exception as e:
+        session.rollback()
+        print(f"[ERROR] [FINALIZE] Erro ao finalizar desafio: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
 
 
 # ==================== CHALLENGES ENDPOINTS ====================
 
 @app.route('/api/challenges', methods=['GET'])
 def get_challenges():
-    """Busca todos os desafios com categorias dinâmicas da tabela challenge_categories."""
+    """Busca todos os desafios com categorias din�micas da tabela challenge_categories."""
     session = SessionLocal()
     try:
-        print("🎮 [CHALLENGES] Buscando desafios REAIS com categorias dinâmicas...")
+        print("[RACE_CAR] [CHALLENGES] Buscando desafios REAIS com categorias din�micas...")
 
         # 1. BUSCAR CATEGORIAS REAIS DA TABELA challenge_categories
         categories_query = session.execute(text('''
@@ -3324,9 +3647,9 @@ def get_challenges():
         categories_data = {row[0]: {'name': row[1], 'color': row[2], 'icon': row[3]} 
                           for row in categories_query.fetchall()}
         
-        print(f"🏷️ [CHALLENGES] Categorias carregadas: {list(categories_data.keys())}")
+        print(f"[BUILDING] [CHALLENGES] Categorias carregadas: {list(categories_data.keys())}")
 
-        # 2. CRIAR MAPEAMENTO DINÂMICO BASEADO NAS CATEGORIAS REAIS
+        # 2. CRIAR MAPEAMENTO DIN�MICO BASEADO NAS CATEGORIAS REAIS
         # Mapear strings de categoria para IDs baseado nos nomes das categorias
         category_string_to_id = {}
         for cat_id, cat_data in categories_data.items():
@@ -3341,25 +3664,25 @@ def get_challenges():
                 category_string_to_id['fitness'] = cat_id
             elif 'yoga' in cat_name:
                 category_string_to_id['calories'] = cat_id
-            elif 'natação' in cat_name:
+            elif 'nata��o' in cat_name:
                 category_string_to_id['swimming'] = cat_id
 
-        print(f"🔗 [CHALLENGES] Mapeamento dinâmico: {category_string_to_id}")
+        print(f"[LINK] [CHALLENGES] Mapeamento din�mico: {category_string_to_id}")
 
-        # 3. BUSCAR DESAFIOS ATIVOS E PENDENTES (MUDANÇA PRINCIPAL)
+        # 3. BUSCAR DESAFIOS ATIVOS E PENDENTES (MUDAN�A PRINCIPAL)
         all_challenges = session.query(Challenge).filter(
             Challenge.status.in_(['active', 'pending'])
         ).order_by(Challenge.created_at.desc()).all()
 
         if not all_challenges:
-            print("⚠️ [CHALLENGES] Nenhum desafio encontrado no banco de dados.")
+            print("[WARNING] [CHALLENGES] Nenhum desafio encontrado no banco de dados.")
             return jsonify({
                 "challenges": [],
                 "total": 0,
                 "message": "Nenhum desafio encontrado."
             })
 
-        # 4. PROCESSAR DESAFIOS COM CATEGORIAS DINÂMICAS
+        # 4. PROCESSAR DESAFIOS COM CATEGORIAS DIN�MICAS
         challenges_data = []
         for challenge in all_challenges:
             challenge_dict = challenge.to_dict()
@@ -3377,7 +3700,7 @@ def get_challenges():
                     'category_id': category_id
                 })
             else:
-                # Fallback se não encontrar mapeamento
+                # Fallback se n�o encontrar mapeamento
                 challenge_dict.update({
                     'category_name': original_category.title(),
                     'category_color': '#3b82f6',
@@ -3401,60 +3724,60 @@ def get_challenges():
             challenges_data.append(challenge_dict)
 
         # Debug do mapeamento
-        print("🏷️ [CHALLENGES DEBUG] Mapeamento dinâmico aplicado:")
+        print("[BUILDING] [CHALLENGES DEBUG] Mapeamento din�mico aplicado:")
         for challenge in challenges_data[:3]:
             status_info = f"({challenge.get('status_label', 'N/A')})"
-            print(f"   - {challenge['title']}: {challenge['category']} → {challenge.get('category_name', 'N/A')} {status_info}")
+            print(f"   - {challenge['title']}: {challenge['category']} -> {challenge.get('category_name', 'N/A')} {status_info}")
 
-        print(f"✅ [CHALLENGES] {len(challenges_data)} desafios processados com categorias dinâmicas.")
+        print(f"[OK] [CHALLENGES] {len(challenges_data)} desafios processados com categorias din�micas.")
         return jsonify({
             "challenges": challenges_data,
             "total": len(challenges_data)
         })
 
     except Exception as e:
-        print(f"❌ [CHALLENGES] Erro ao buscar desafios: {e}")
+        print(f"[ERROR] [CHALLENGES] Erro ao buscar desafios: {e}")
         return jsonify({"error": f"Erro ao buscar desafios: {str(e)}"}), 500
     finally:
         session.close()
 
-# 1. ATUALIZAR A FUNÇÃO create_challenge EXISTENTE
+# 1. ATUALIZAR A FUN��O create_challenge EXISTENTE
 @app.route('/api/challenges', methods=['POST'])
 def create_challenge():
-    """Criar desafio com suporte a múltiplos vencedores"""
+    """Criar desafio com suporte a m�ltiplos vencedores"""
     session = SessionLocal()
     try:
         data = request.get_json()
         
-        print(f"🎮 [CREATE_CHALLENGE] Criando desafio com múltiplos vencedores...")
-        print(f"🎮 [CREATE_CHALLENGE] Dados recebidos: {data}")
+        print(f"[RACE_CAR] [CREATE_CHALLENGE] Criando desafio com m�ltiplos vencedores...")
+        print(f"[RACE_CAR] [CREATE_CHALLENGE] Dados recebidos: {data}")
         
-        # Validar campos obrigatórios
+        # Validar campos obrigat�rios
         required_fields = ['title', 'description', 'category_id', 'target_value', 'stake_min', 'stake_max', 'start_at']
         for field in required_fields:
             if field not in data or not data[field]:
-                return jsonify({"error": f"Campo obrigatório: {field}"}), 400
+                return jsonify({"error": f"Campo obrigat�rio: {field}"}), 400
         
-        # PROCESSAR CAMPOS DE MÚLTIPLOS VENCEDORES
+        # PROCESSAR CAMPOS DE M�LTIPLOS VENCEDORES
         max_winners = int(data.get('max_winners', 1))
         winner_selection_type = data.get('winner_selection_type', 'first_to_complete')
         prize_distribution_type = data.get('prize_distribution_type', 'equal')
         
-        # Validações específicas para múltiplos vencedores
+        # Valida��es espec�ficas para m�ltiplos vencedores
         if max_winners < 1 or max_winners > 50:
-            return jsonify({"error": "Número de vencedores deve estar entre 1 e 50"}), 400
+            return jsonify({"error": "N�mero de vencedores deve estar entre 1 e 50"}), 400
         
         max_participants = int(data.get('max_participants', 100))
         if max_winners > max_participants:
-            return jsonify({"error": "Número de vencedores não pode ser maior que máximo de participantes"}), 400
+            return jsonify({"error": "N�mero de vencedores n�o pode ser maior que m�ximo de participantes"}), 400
         
         valid_selection_types = ['first_to_complete', 'top_performers', 'all_qualifiers']
         if winner_selection_type not in valid_selection_types:
-            return jsonify({"error": f"Tipo de seleção inválido. Use: {', '.join(valid_selection_types)}"}), 400
+            return jsonify({"error": f"Tipo de sele��o inv�lido. Use: {', '.join(valid_selection_types)}"}), 400
         
         valid_distribution_types = ['equal', 'proportional', 'ranking_based']
         if prize_distribution_type not in valid_distribution_types:
-            return jsonify({"error": f"Tipo de distribuição inválido. Use: {', '.join(valid_distribution_types)}"}), 400
+            return jsonify({"error": f"Tipo de distribui��o inv�lido. Use: {', '.join(valid_distribution_types)}"}), 400
         
         # 1. BUSCAR CATEGORIA REAL DA TABELA challenge_categories
 
@@ -3473,13 +3796,13 @@ def create_challenge():
             temp_conn.close()
             
             if not category_result:
-                return jsonify({"error": f"Categoria ID {category_id} não encontrada ou inativa"}), 400
+                return jsonify({"error": f"Categoria ID {category_id} n�o encontrada ou inativa"}), 400
             
             category_name = category_result[1]
-            print(f"🏷️ [CREATE_CHALLENGE] Categoria encontrada: ID {category_id} = '{category_name}'")
+            print(f"[BUILDING] [CREATE_CHALLENGE] Categoria encontrada: ID {category_id} = '{category_name}'")
             
         except Exception as e:  # <- ADICIONE ESTA LINHA
-            print(f"❌ [CREATE_CHALLENGE] Erro ao buscar categoria: {e}")
+            print(f"[ERROR] [CREATE_CHALLENGE] Erro ao buscar categoria: {e}")
             return jsonify({"error": f"Erro ao validar categoria: {str(e)}"}), 400
         
         # 2. MAPEAR NOME DA CATEGORIA PARA STRING INTERNA
@@ -3489,7 +3812,7 @@ def create_challenge():
             'caminhada': 'steps',
             'fitness': 'fitness',
             'yoga': 'calories',
-            'natação': 'swimming'
+            'nata��o': 'swimming'
         }
         
         category_string = None
@@ -3501,16 +3824,16 @@ def create_challenge():
         if not category_string:
             category_string = 'fitness'
         
-        print(f"🔗 [CREATE_CHALLENGE] Mapeamento: '{category_name}' → '{category_string}'")
+        print(f"[LINK] [CREATE_CHALLENGE] Mapeamento: '{category_name}' -> '{category_string}'")
         
-        # 3. PROCESSAR DATA DE INÍCIO
+        # 3. PROCESSAR DATA DE IN�CIO
         try:
             start_date = datetime.fromisoformat(data['start_at'].replace('Z', '+00:00'))
             start_date = start_date.replace(tzinfo=None)
-            print(f"📅 [CREATE_CHALLENGE] Data de início: {start_date}")
+            print(f"[CALENDAR] [CREATE_CHALLENGE] Data de in�cio: {start_date}")
         except Exception as e:
-            print(f"❌ [CREATE_CHALLENGE] Erro ao processar data: {e}")
-            return jsonify({"error": "Data de início inválida"}), 400
+            print(f"[ERROR] [CREATE_CHALLENGE] Erro ao processar data: {e}")
+            return jsonify({"error": "Data de in�cio inv�lida"}), 400
         
         # 4. DETERMINAR STATUS
         now = datetime.utcnow()
@@ -3518,13 +3841,13 @@ def create_challenge():
         status = 'pending' if is_future else 'active'
         end_date = start_date + timedelta(days=7)
         
-        print(f"📅 [CREATE_CHALLENGE] Status: {status}")
-        print(f"🏆 [CREATE_CHALLENGE] Configuração de vencedores:")
+        print(f"[CALENDAR] [CREATE_CHALLENGE] Status: {status}")
+        print(f"[TROPHY] [CREATE_CHALLENGE] Configura��o de vencedores:")
         print(f"   - Max vencedores: {max_winners}")
-        print(f"   - Seleção: {winner_selection_type}")
-        print(f"   - Distribuição: {prize_distribution_type}")
+        print(f"   - Sele��o: {winner_selection_type}")
+        print(f"   - Distribui��o: {prize_distribution_type}")
         
-        # Criar novo desafio COM CAMPOS DE MÚLTIPLOS VENCEDORES
+        # Criar novo desafio COM CAMPOS DE M�LTIPLOS VENCEDORES
         new_challenge = Challenge(
             id=str(uuid.uuid4()),
             title=data['title'].strip(),
@@ -3549,7 +3872,7 @@ def create_challenge():
             target_unit=data.get('target_unit', 'km'),
             validation_rules=data.get('requirements', ''),
             required_app_category=category_string,
-            # NOVOS CAMPOS PARA MÚLTIPLOS VENCEDORES
+            # NOVOS CAMPOS PARA M�LTIPLOS VENCEDORES
             max_winners=max_winners,
             winner_selection_type=winner_selection_type,
             prize_distribution_type=prize_distribution_type
@@ -3558,13 +3881,13 @@ def create_challenge():
         session.add(new_challenge)
         session.commit()
         
-        print(f"✅ [CREATE_CHALLENGE] Desafio criado com múltiplos vencedores:")
-        print(f"   - Título: {new_challenge.title}")
-        print(f"   - Categoria: {category_name} → {category_string}")
+        print(f"[OK] [CREATE_CHALLENGE] Desafio criado com m�ltiplos vencedores:")
+        print(f"   - T�tulo: {new_challenge.title}")
+        print(f"   - Categoria: {category_name} -> {category_string}")
         print(f"   - Status: {new_challenge.status}")
         print(f"   - Vencedores: {max_winners}")
-        print(f"   - Seleção: {winner_selection_type}")
-        print(f"   - Distribuição: {prize_distribution_type}")
+        print(f"   - Sele��o: {winner_selection_type}")
+        print(f"   - Distribui��o: {prize_distribution_type}")
         
         # Retornar dados com categoria mapeada
         challenge_data = {
@@ -3589,7 +3912,7 @@ def create_challenge():
             'start_at': new_challenge.start_date.isoformat() if new_challenge.start_date else None,
             'is_scheduled': is_future,
             'time_until_start': (start_date - now).total_seconds() if is_future else 0,
-            # CAMPOS DE MÚLTIPLOS VENCEDORES
+            # CAMPOS DE M�LTIPLOS VENCEDORES
             'max_winners': max_winners,
             'winner_selection_type': winner_selection_type,
             'prize_distribution_type': prize_distribution_type,
@@ -3608,34 +3931,34 @@ def create_challenge():
         
     except Exception as e:
         session.rollback()
-        print(f"❌ [CREATE_CHALLENGE] Erro ao criar desafio: {e}")
+        print(f"[ERROR] [CREATE_CHALLENGE] Erro ao criar desafio: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": f"Erro ao criar desafio: {str(e)}"}), 500
     finally:
         session.close()
 
-# ADICIONE TAMBÉM O HANDLER OPTIONS PARA CORS
+# ADICIONE TAMB�M O HANDLER OPTIONS PARA CORS
 @app.route('/api/challenges', methods=['OPTIONS'])
 def challenges_options():
-    """Handler para requisições OPTIONS do endpoint challenges"""
+    """Handler para requisi��es OPTIONS do endpoint challenges"""
     return '', 200
 
 @app.route('/api/challenges/my-participations', methods=['GET'])
 def get_user_participations():
-    """Busca participações do usuário com detalhes completos dos desafios"""
+    """Busca participa��es do usu�rio com detalhes completos dos desafios"""
     session = SessionLocal()
     try:
         user_email = request.args.get('user_email')
         if not user_email:
-            return jsonify({"error": "Email do usuário é obrigatório"}), 400
+            return jsonify({"error": "Email do usu�rio � obrigat�rio"}), 400
         
-        print(f"🎯 [PARTICIPATIONS] Buscando participações para: {user_email}")
+        print(f"[TARGET] [PARTICIPATIONS] Buscando participa��es para: {user_email}")
         
-        # Buscar usuário por email
+        # Buscar usu�rio por email
         user = session.query(User).filter_by(email=user_email).first()
         if not user:
-            print(f"❌ [PARTICIPATIONS] Usuário não encontrado: {user_email}")
+            print(f"[ERROR] [PARTICIPATIONS] Usu�rio n�o encontrado: {user_email}")
             return jsonify({
                 "participations": [],
                 "active_participations": [],
@@ -3643,17 +3966,17 @@ def get_user_participations():
                 "total": 0,
                 "active_count": 0,
                 "completed_count": 0,
-                "message": "Usuário não encontrado"
+                "message": "Usu�rio n�o encontrado"
             }), 404
         
-        # Buscar participações do usuário
+        # Buscar participa��es do usu�rio
         participations = session.query(ChallengeParticipation).filter_by(user_id=user.id).all()
         
-        # Mock de detalhes dos desafios (em produção, viria de uma tabela challenges)
+        # Mock de detalhes dos desafios (em produ��o, viria de uma tabela challenges)
         challenges_details = {
             'challenge_001': {
                 'title': 'Corrida 5km em 30min',
-                'description': 'Complete uma corrida de 5km em até 30 minutos',
+                'description': 'Complete uma corrida de 5km em at� 30 minutos',
                 'category': 'running',
                 'difficulty': 'medium'
             },
@@ -3665,7 +3988,7 @@ def get_user_participations():
             },
             'challenge_003': {
                 'title': 'Treino HIIT 45min',
-                'description': 'Complete um treino HIIT de 45 minutos com frequência cardíaca elevada',
+                'description': 'Complete um treino HIIT de 45 minutos com frequ�ncia card�aca elevada',
                 'category': 'fitness',
                 'difficulty': 'hard'
             }
@@ -3698,13 +4021,13 @@ def get_user_participations():
                 'is_completed': participation.status == 'completed'
             })
         
-        print(f"✅ [PARTICIPATIONS] Encontradas {len(participations_list)} participações para {user_email}")
+        print(f"[OK] [PARTICIPATIONS] Encontradas {len(participations_list)} participa��es para {user_email}")
         
-        # Separar participações ativas e completadas
+        # Separar participa��es ativas e completadas
         active_participations = [p for p in participations_list if p['is_active']]
         completed_participations = [p for p in participations_list if p['is_completed']]
         
-        print(f"📊 [PARTICIPATIONS] Ativas: {len(active_participations)}, Completadas: {len(completed_participations)}")
+        print(f"[CHART] [PARTICIPATIONS] Ativas: {len(active_participations)}, Completadas: {len(completed_participations)}")
         
         return jsonify({
             "participations": participations_list,
@@ -3716,20 +4039,20 @@ def get_user_participations():
         })
         
     except Exception as e:
-        print(f"❌ [PARTICIPATIONS] Erro ao buscar participações: {e}")
-        return jsonify({"error": f"Erro ao buscar participações: {str(e)}"}), 500
+        print(f"[ERROR] [PARTICIPATIONS] Erro ao buscar participa��es: {e}")
+        return jsonify({"error": f"Erro ao buscar participa��es: {str(e)}"}), 500
     finally:
         session.close()
 
 
-# 1. ADICIONAR FUNÇÃO HELPER PARA BUSCAR TAXA DINÂMICA
+# 1. ADICIONAR FUN��O HELPER PARA BUSCAR TAXA DIN�MICA
 def get_dynamic_platform_fee():
     """Busca a taxa da plataforma do banco de dados dinamicamente"""
     try:
-        # Usar o settings_manager que já existe no código
+        # Usar o settings_manager que j� existe no c�digo
         platform_fee = settings_manager.get('platform', 'platform_fee', 10.0)
         
-        # Garantir que é um número válido
+        # Garantir que � um n�mero v�lido
         if platform_fee is None:
             platform_fee = 10.0
         
@@ -3741,16 +4064,16 @@ def get_dynamic_platform_fee():
         elif platform_fee > 100:
             platform_fee = 100.0
             
-        print(f"💰 [DYNAMIC-FEE] Taxa carregada do banco: {platform_fee}%")
+        print(f"[MONEY] [DYNAMIC-FEE] Taxa carregada do banco: {platform_fee}%")
         return platform_fee
         
     except Exception as e:
-        print(f"❌ [DYNAMIC-FEE] Erro ao buscar taxa, usando padrão 10%: {e}")
+        print(f"[ERROR] [DYNAMIC-FEE] Erro ao buscar taxa, usando padr�o 10%: {e}")
         return 10.0
 
 
 def calculate_prize_distribution(total_prize_pool, winners_data, distribution_type='equal'):
-    """Calcula como distribuir o prêmio entre múltiplos vencedores"""
+    """Calcula como distribuir o pr�mio entre m�ltiplos vencedores"""
     if not winners_data or total_prize_pool <= 0:
         return []
     
@@ -3825,9 +4148,9 @@ def calculate_prize_distribution(total_prize_pool, winners_data, distribution_ty
     
     return distribution
 
-# 4. FUNÇÃO PARA DETERMINAR VENCEDORES
+# 4. FUN��O PARA DETERMINAR VENCEDORES
 def determine_challenge_winners(challenge, completed_participations):
-    """Determina quem são os vencedores baseado na configuração do desafio"""
+    """Determina quem s�o os vencedores baseado na configura��o do desafio"""
     max_winners = getattr(challenge, 'max_winners', 1) or 1
     selection_type = getattr(challenge, 'winner_selection_type', 'first_to_complete') or 'first_to_complete'
     
@@ -3886,10 +4209,10 @@ def determine_challenge_winners(challenge, completed_participations):
     return winners
 
 
-# 5. SUBSTITUIR FUNÇÃO complete_challenge EXISTENTE
+# 5. SUBSTITUIR FUN��O complete_challenge EXISTENTE
 @app.route('/api/challenges/<challenge_id>/complete', methods=['POST'])
 def complete_challenge(challenge_id):
-    """Completar desafio com suporte a múltiplos vencedores"""
+    """Completar desafio com suporte a m�ltiplos vencedores"""
     session = SessionLocal()
     try:
         data = request.get_json()
@@ -3897,19 +4220,19 @@ def complete_challenge(challenge_id):
         completion_data = data.get('completion_data', {})
         result_value = completion_data.get('result_value', 80)
         
-        print(f"🏆 [COMPLETE-MULTI] Usuário {user_email} completando desafio {challenge_id}")
+        print(f"[TROPHY] [COMPLETE-MULTI] Usu�rio {user_email} completando desafio {challenge_id}")
         
-        # Validações básicas
+        # Valida��es b�sicas
         if not user_email:
-            return jsonify({'error': 'Email do usuário é obrigatório'}), 400
+            return jsonify({'error': 'Email do usu�rio � obrigat�rio'}), 400
         
         user = session.query(User).filter_by(email=user_email).first()
         if not user:
-            return jsonify({'error': 'Usuário não encontrado'}), 404
+            return jsonify({'error': 'Usu�rio n�o encontrado'}), 404
         
         wallet = session.query(Wallet).filter_by(user_id=user.id).first()
         if not wallet:
-            return jsonify({'error': 'Carteira não encontrada'}), 404
+            return jsonify({'error': 'Carteira n�o encontrada'}), 404
         
         participation = session.query(ChallengeParticipation).filter_by(
             challenge_id=challenge_id,
@@ -3918,13 +4241,13 @@ def complete_challenge(challenge_id):
         ).first()
         
         if not participation:
-            return jsonify({'error': 'Participação não encontrada ou já completada'}), 404
+            return jsonify({'error': 'Participa��o n�o encontrada ou j� completada'}), 404
         
         challenge = session.query(Challenge).filter_by(id=challenge_id).first()
         if not challenge:
-            return jsonify({'error': 'Desafio não encontrado'}), 404
+            return jsonify({'error': 'Desafio n�o encontrado'}), 404
         
-        # MARCAR PARTICIPAÇÃO COMO COMPLETADA
+        # MARCAR PARTICIPA��O COMO COMPLETADA
         participation.status = 'completed'
         participation.result_value = result_value
         participation.completed_at = datetime.utcnow()
@@ -3937,7 +4260,7 @@ def complete_challenge(challenge_id):
         
         session.commit()
         
-        print(f"🎯 [COMPLETE-MULTI] Participação completada. Qualificado: {is_qualified}")
+        print(f"[TARGET] [COMPLETE-MULTI] Participa��o completada. Qualificado: {is_qualified}")
         
         # VERIFICAR SE DEVE FINALIZAR O DESAFIO
         remaining_active = session.query(ChallengeParticipation).filter_by(
@@ -3954,9 +4277,9 @@ def complete_challenge(challenge_id):
         selection_type = getattr(challenge, 'winner_selection_type', 'first_to_complete') or 'first_to_complete'
         qualified_completed = [p for p in completed_participations if (p.result_value or 0) >= min_score_required]
         
-        print(f"📊 [COMPLETE-MULTI] Status: {remaining_active} ativas, {len(qualified_completed)} qualificadas, max {max_winners}")
+        print(f"[CHART] [COMPLETE-MULTI] Status: {remaining_active} ativas, {len(qualified_completed)} qualificadas, max {max_winners}")
         
-        # CONDIÇÕES PARA FINALIZAR
+        # CONDI��ES PARA FINALIZAR
         should_finalize = False
         finalize_reason = ""
         
@@ -3967,14 +4290,14 @@ def complete_challenge(challenge_id):
         else:
             if remaining_active == 0:
                 should_finalize = True
-                finalize_reason = "Todas as participações foram completadas"
+                finalize_reason = "Todas as participa��es foram completadas"
         
         total_prize_awarded = 0
         user_prize = 0
         distribution_result = []
         
         if should_finalize:
-            print(f"🎊 [COMPLETE-MULTI] Finalizando desafio: {finalize_reason}")
+            print(f"[CONFETTI] [COMPLETE-MULTI] Finalizando desafio: {finalize_reason}")
             
             # CALCULAR POOL E TAXA
             from sqlalchemy import func
@@ -3987,7 +4310,7 @@ def complete_challenge(challenge_id):
             house_fee = total_pool * (house_percentage / 100)
             prize_pool = total_pool - house_fee
             
-            print(f"💰 [COMPLETE-MULTI] Pool: R$ {total_pool:.2f}, Taxa: {house_percentage}%, Prêmios: R$ {prize_pool:.2f}")
+            print(f"[MONEY] [COMPLETE-MULTI] Pool: R$ {total_pool:.2f}, Taxa: {house_percentage}%, Pr�mios: R$ {prize_pool:.2f}")
             
             # DETERMINAR VENCEDORES
             winners = determine_challenge_winners(challenge, completed_participations)
@@ -3996,9 +4319,9 @@ def complete_challenge(challenge_id):
                 distribution_type = getattr(challenge, 'prize_distribution_type', 'equal') or 'equal'
                 distribution = calculate_prize_distribution(prize_pool, winners, distribution_type)
                 
-                print(f"🏆 [COMPLETE-MULTI] {len(winners)} vencedores, distribuição: {distribution_type}")
+                print(f"[TROPHY] [COMPLETE-MULTI] {len(winners)} vencedores, distribui��o: {distribution_type}")
                 
-                # DISTRIBUIR PRÊMIOS
+                # DISTRIBUIR PR�MIOS
                 for dist in distribution:
                     winner_user_id = dist['user_id']
                     prize_amount = dist['prize_amount']
@@ -4014,7 +4337,7 @@ def complete_challenge(challenge_id):
                             user_id=winner_user_id,
                             type='prize',
                             amount=prize_amount,
-                            description=f'Prêmio - Posição {dist["position"]}º - {challenge.title} ({dist["prize_percentage"]}% do pool)',
+                            description=f'Pr�mio - Posi��o {dist["position"]}o - {challenge.title} ({dist["prize_percentage"]}% do pool)',
                             status='completed'
                         )
                         session.add(prize_transaction)
@@ -4041,9 +4364,9 @@ def complete_challenge(challenge_id):
                             """), challenge_winner)
                             
                         except Exception as e:
-                            print(f"⚠️ [COMPLETE-MULTI] Erro ao registrar vencedor na tabela: {e}")
+                            print(f"[WARNING] [COMPLETE-MULTI] Erro ao registrar vencedor na tabela: {e}")
                         
-                        # ATUALIZAR PARTICIPAÇÃO
+                        # ATUALIZAR PARTICIPA��O
                         winner_participation = session.query(ChallengeParticipation).filter_by(
                             challenge_id=challenge_id,
                             user_id=winner_user_id
@@ -4057,7 +4380,7 @@ def complete_challenge(challenge_id):
                         if winner_user_id == user.id:
                             user_prize = prize_amount
                         
-                        print(f"💰 [COMPLETE-MULTI] Vencedor {dist['position']}º: R$ {prize_amount:.2f}")
+                        print(f"[MONEY] [COMPLETE-MULTI] Vencedor {dist['position']}o: R$ {prize_amount:.2f}")
                 
                 distribution_result = distribution
             
@@ -4114,15 +4437,15 @@ def complete_challenge(challenge_id):
             }
         }
         
-        print(f"✅ [COMPLETE-MULTI] Usuário {user_email}: {'Vencedor' if user_prize > 0 else 'Completou'}")
+        print(f"[OK] [COMPLETE-MULTI] Usu�rio {user_email}: {'Vencedor' if user_prize > 0 else 'Completou'}")
         if user_prize > 0:
-            print(f"🎉 [COMPLETE-MULTI] Prêmio recebido: R$ {user_prize:.2f}")
+            print(f"[CELEBRATE] [COMPLETE-MULTI] Pr�mio recebido: R$ {user_prize:.2f}")
         
         return jsonify(response_data), 200
         
     except Exception as e:
         session.rollback()
-        print(f"❌ [COMPLETE-MULTI] Erro: {e}")
+        print(f"[ERROR] [COMPLETE-MULTI] Erro: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'Erro ao completar desafio: {str(e)}'}), 500
@@ -4132,7 +4455,7 @@ def complete_challenge(challenge_id):
 # 4. ENDPOINT PARA LISTAR VENCEDORES DE UM DESAFIO
 @app.route('/api/challenges/<challenge_id>/winners', methods=['GET'])
 def get_challenge_winners(challenge_id):
-    """Listar vencedores de um desafio específico"""
+    """Listar vencedores de um desafio espec�fico"""
     session = SessionLocal()
     try:
         winners_query = session.execute(text("""
@@ -4168,21 +4491,21 @@ def get_challenge_winners(challenge_id):
         }), 200
         
     except Exception as e:
-        print(f"❌ [WINNERS] Erro ao buscar vencedores: {e}")
+        print(f"[ERROR] [WINNERS] Erro ao buscar vencedores: {e}")
         return jsonify({'error': str(e)}), 500
     finally:
         session.close()
 
-print("✅ SISTEMA DE MÚLTIPLOS VENCEDORES IMPLEMENTADO!")
-print("🏆 FUNCIONALIDADES ADICIONADAS:")
+print("[OK] SISTEMA DE M�LTIPLOS VENCEDORES IMPLEMENTADO!")
+print("[TROPHY] FUNCIONALIDADES ADICIONADAS:")
 print("   - Suporte a 1-50 vencedores por desafio")
-print("   - 3 tipos de seleção: first_to_complete, top_performers, all_qualifiers")
-print("   - 3 tipos de distribuição: equal, proportional, ranking_based")
-print("   - Tabela challenge_winners para histórico")
-print("   - Taxa dinâmica aplicada corretamente")
+print("   - 3 tipos de sele��o: first_to_complete, top_performers, all_qualifiers")
+print("   - 3 tipos de distribui��o: equal, proportional, ranking_based")
+print("   - Tabela challenge_winners para hist�rico")
+print("   - Taxa din�mica aplicada corretamente")
 print("   - Endpoint /api/challenges/{id}/winners")
 
-# 5. ATUALIZAR FUNÇÃO create_challenge PARA INCLUIR NOVOS CAMPOS
+# 5. ATUALIZAR FUN��O create_challenge PARA INCLUIR NOVOS CAMPOS
 # (Adicionar ao endpoint existente create_challenge)
 def update_create_challenge_for_multiple_winners():
     """
@@ -4194,15 +4517,15 @@ def update_create_challenge_for_multiple_winners():
     Adicione estes campos ao processar formData:
     """
     example_code = """
-    # Dentro da função create_challenge existente, adicionar:
+    # Dentro da fun��o create_challenge existente, adicionar:
     
     max_winners = int(data.get('max_winners', 1))
     winner_selection_type = data.get('winner_selection_type', 'first_to_complete') 
     prize_distribution_type = data.get('prize_distribution_type', 'equal')
     
-    # Validações
+    # Valida��es
     if max_winners < 1 or max_winners > 50:
-        return jsonify({"error": "Número de vencedores deve estar entre 1 e 50"}), 400
+        return jsonify({"error": "N�mero de vencedores deve estar entre 1 e 50"}), 400
     
     # Ao criar o objeto Challenge, adicionar:
     new_challenge = Challenge(
@@ -4217,21 +4540,21 @@ def update_create_challenge_for_multiple_winners():
 
 @app.route('/api/user/bets', methods=['GET'])
 def get_user_bets():
-    """Busca histórico de apostas do usuário - HISTÓRICO COMPLETO"""
+    """Busca hist�rico de apostas do usu�rio - HIST�RICO COMPLETO"""
     session = SessionLocal()
     try:
         user_email = request.args.get('email')
         if not user_email:
-            return jsonify({'error': 'Email é obrigatório'}), 400
+            return jsonify({'error': 'Email � obrigat�rio'}), 400
         
-        print(f"📊 [BETS] Buscando histórico de apostas para: {user_email}")
+        print(f"[CHART] [BETS] Buscando hist�rico de apostas para: {user_email}")
         
-        # Buscar usuário
+        # Buscar usu�rio
         user = session.query(User).filter_by(email=user_email).first()
         if not user:
-            return jsonify({'error': 'Usuário não encontrado'}), 404
+            return jsonify({'error': 'Usu�rio n�o encontrado'}), 404
         
-        # Buscar transações de apostas e prêmios
+        # Buscar transa��es de apostas e pr�mios
         transactions = session.query(Transaction).filter(
             Transaction.user_id == user.id,
             Transaction.type.in_(['bet', 'prize', 'bonus'])
@@ -4248,7 +4571,7 @@ def get_user_bets():
                 'created_at': tx.created_at.isoformat() if tx.created_at else None
             })
         
-        # Estatísticas do usuário
+        # Estat�sticas do usu�rio
         stats = {
             'total_bets': user.total_bets or 0,
             'total_wins': user.total_wins or 0,
@@ -4265,8 +4588,8 @@ def get_user_bets():
         })
         
     except Exception as e:
-        print(f"❌ [BETS] Erro ao buscar histórico: {e}")
-        return jsonify({'error': f'Erro ao buscar histórico: {str(e)}'}), 500
+        print(f"[ERROR] [BETS] Erro ao buscar hist�rico: {e}")
+        return jsonify({'error': f'Erro ao buscar hist�rico: {str(e)}'}), 500
     finally:
         session.close()
 
@@ -4278,17 +4601,17 @@ def get_global_activities():
     try:
         limit = request.args.get('limit', 20, type=int)
         
-        print(f"🌍 [ACTIVITIES] Buscando {limit} atividades globais...")
+        print(f"[BAMBOO] [ACTIVITIES] Buscando {limit} atividades globais...")
         
         # Mock de atividades globais
         activities = []
         for i in range(min(limit, 20)):
             activity = {
                 "id": i + 1,
-                "user_name": f"Usuário {i + 1}",
+                "user_name": f"Usu�rio {i + 1}",
                 "user_avatar": f"https://ui-avatars.com/api/?name=User{i+1}&background=random",
                 "action": ["completou um desafio", "fez uma aposta", "ganhou um desafio", "atingiu uma meta"][i % 4],
-                "challenge_title": f"Desafio {['Corrida 5K', 'Ciclismo 20K', 'Passos Diários', 'Treino HIIT'][i % 4]}",
+                "challenge_title": f"Desafio {['Corrida 5K', 'Ciclismo 20K', 'Passos Di�rios', 'Treino HIIT'][i % 4]}",
                 "amount": round(10 + (i * 5.5), 2),
                 "timestamp": (datetime.now() - timedelta(minutes=i * 15)).isoformat(),
                 "type": ["challenge_completed", "bet_placed", "challenge_won", "goal_achieved"][i % 4]
@@ -4302,19 +4625,19 @@ def get_global_activities():
         })
         
     except Exception as e:
-        print(f"❌ [ACTIVITIES] Erro ao buscar atividades globais: {e}")
+        print(f"[ERROR] [ACTIVITIES] Erro ao buscar atividades globais: {e}")
         return jsonify({"error": f"Erro ao buscar atividades globais: {str(e)}"}), 500
 
 # ==================== ADMIN ENDPOINTS ====================
 
 @app.route('/api/admin/dashboard/metrics', methods=['GET'])
 def admin_dashboard_metrics():
-    """Obter métricas REAIS para o dashboard admin - COM LUCROS DA CASA"""
+    """Obter m�tricas REAIS para o dashboard admin - COM LUCROS DA CASA"""
     session = SessionLocal()
     try:
-        print("📊 [ADMIN] Buscando métricas do dashboard...")
+        print("[CHART] [ADMIN] Buscando m�tricas do dashboard...")
         
-        # Contar usuários REAIS
+        # Contar usu�rios REAIS
         total_users = session.query(User).count()
         active_users = session.query(User).filter_by(status='active').count()
         blocked_users = session.query(User).filter_by(status='blocked').count()
@@ -4323,25 +4646,25 @@ def admin_dashboard_metrics():
         wallets = session.query(Wallet).all()
         total_balance = sum(float(w.balance or 0) for w in wallets)
         
-        # Calcular saldo médio
+        # Calcular saldo m�dio
         avg_balance = total_balance / max(total_users, 1)
         
         # Encontrar maior saldo
         max_balance_wallet = session.query(Wallet).order_by(Wallet.balance.desc()).first()
         max_balance = float(max_balance_wallet.balance) if max_balance_wallet else 0.0
         
-        # Contar usuários com saldo > 0
+        # Contar usu�rios com saldo > 0
         users_with_balance = session.query(Wallet).filter(Wallet.balance > 0).count()
         
-        # Estatísticas KYC REAIS
+        # Estat�sticas KYC REAIS
         kyc_pending = session.query(User).filter_by(kyc_status='pending').count()
         kyc_verified = session.query(User).filter_by(kyc_status='verified').count()
         
-        # Contar transações REAIS
+        # Contar transa��es REAIS
         total_transactions = session.query(Transaction).count()
         completed_transactions = session.query(Transaction).filter_by(status='completed').count()
         
-        # Somar valores das transações
+        # Somar valores das transa��es
         bet_transactions = session.query(Transaction).filter_by(type='bet').all()
         total_bets_value = sum(abs(float(tx.amount)) for tx in bet_transactions)
         
@@ -4351,7 +4674,7 @@ def admin_dashboard_metrics():
         bonus_transactions = session.query(Transaction).filter_by(type='bonus').all()
         total_bonus_value = sum(float(tx.amount) for tx in bonus_transactions)
         
-        # === NOVA SEÇÃO: CALCULAR LUCROS DA CASA ===
+        # === NOVA SE��O: CALCULAR LUCROS DA CASA ===
         
         # 1. Buscar todos os pools de desafios completados
         from sqlalchemy import func, text
@@ -4379,22 +4702,22 @@ def admin_dashboard_metrics():
             if challenge and challenge.status == 'completed':
                 completed_challenges_revenue += house_cut
         
-        # Estatísticas de rake/fee
+        # Estat�sticas de rake/fee
         estimated_monthly_revenue = house_revenue * 4  # Estimativa baseada em semana
         average_rake_per_challenge = house_revenue / max(len(pools_query), 1)
         
-        print(f"💰 [ADMIN] LUCROS DA CASA CALCULADOS:")
+        print(f"[MONEY] [ADMIN] LUCROS DA CASA CALCULADOS:")
         print(f"  - Total de pools: R$ {total_pool_volume:.2f}")
         print(f"  - Rake total (10%): R$ {house_revenue:.2f}")
         print(f"  - Rake de desafios completos: R$ {completed_challenges_revenue:.2f}")
-        print(f"  - Rake médio por desafio: R$ {average_rake_per_challenge:.2f}")
+        print(f"  - Rake m�dio por desafio: R$ {average_rake_per_challenge:.2f}")
         
-        # Contar participações em desafios
+        # Contar participa��es em desafios
         total_participations = session.query(ChallengeParticipation).count()
         active_participations = session.query(ChallengeParticipation).filter_by(status='active').count()
         completed_participations = session.query(ChallengeParticipation).filter_by(status='completed').count()
         
-        # === MÉTRICAS EXPANDIDAS COM LUCROS ===
+        # === M�TRICAS EXPANDIDAS COM LUCROS ===
         metrics = {
             "users": {
                 "total": total_users,
@@ -4435,7 +4758,7 @@ def admin_dashboard_metrics():
                 "total_pool_volume": round(total_pool_volume, 2),
                 "challenges_with_pools": len(pools_query)
             },
-            # === NOVA SEÇÃO: LUCROS DA CASA ===
+            # === NOVA SE��O: LUCROS DA CASA ===
             "house_revenue": {
                 "total_rake": round(house_revenue, 2),
                 "completed_challenges_rake": round(completed_challenges_revenue, 2),
@@ -4445,7 +4768,7 @@ def admin_dashboard_metrics():
                 "rake_percentage": 10.0,
                 "total_pool_volume": round(total_pool_volume, 2),
                 "challenges_processed": len(pools_query),
-                # Métricas de performance
+                # M�tricas de performance
                 "revenue_per_user": round(house_revenue / max(total_users, 1), 2),
                 "revenue_per_active_user": round(house_revenue / max(active_users, 1), 2),
                 "conversion_rate": round((total_participations / max(total_users, 1)) * 100, 1)
@@ -4458,31 +4781,31 @@ def admin_dashboard_metrics():
             }
         }
         
-        print(f"✅ [ADMIN] Métricas coletadas com lucros da casa: {total_users} usuários, R$ {house_revenue:.2f} de rake")
+        print(f"[OK] [ADMIN] M�tricas coletadas com lucros da casa: {total_users} usu�rios, R$ {house_revenue:.2f} de rake")
         return jsonify(metrics)
         
     except Exception as e:
-        print(f"❌ [ADMIN] Erro ao buscar métricas: {e}")
+        print(f"[ERROR] [ADMIN] Erro ao buscar m�tricas: {e}")
         import traceback
-        print(f"❌ [ADMIN] Stack trace: {traceback.format_exc()}")
-        return jsonify({"error": f"Erro ao buscar métricas: {str(e)}"}), 500
+        print(f"[ERROR] [ADMIN] Stack trace: {traceback.format_exc()}")
+        return jsonify({"error": f"Erro ao buscar m�tricas: {str(e)}"}), 500
     finally:
         session.close()
 
 @app.route('/api/users', methods=['GET'])
 def get_users():
-    """Busca lista de usuários com paginação e filtros - DADOS REAIS DO BANCO"""
+    """Busca lista de usu�rios com pagina��o e filtros - DADOS REAIS DO BANCO"""
     session = SessionLocal()
     try:
-        print("👥 [USERS] Buscando lista de usuários...")
+        print("[PEOPLE] [USERS] Buscando lista de usu�rios...")
         
-        # Parâmetros de paginação e filtros
+        # Par�metros de pagina��o e filtros
         page = int(request.args.get('page', 1))
         limit = int(request.args.get('limit', 10))
         search = request.args.get('search', '').strip()
         status_filter = request.args.get('status', '').strip()
         
-        print(f"👥 [USERS] Parâmetros: page={page}, limit={limit}, search='{search}', status='{status_filter}'")
+        print(f"[PEOPLE] [USERS] Par�metros: page={page}, limit={limit}, search='{search}', status='{status_filter}'")
         
         # Query base
         query = session.query(User)
@@ -4504,43 +4827,43 @@ def get_users():
                 
                 if search_conditions:
                     query = query.filter(or_(*search_conditions))
-                    print(f"🔍 [USERS] Filtro de busca aplicado para: '{search}'")
+                    print(f"[SEARCH] [USERS] Filtro de busca aplicado para: '{search}'")
                 
             except Exception as search_error:
-                print(f"⚠️ [USERS] Erro no filtro de busca: {search_error}")
+                print(f"[WARNING] [USERS] Erro no filtro de busca: {search_error}")
                 # Continuar sem filtro de busca se houver erro
         
         if status_filter:
             try:
                 if hasattr(User, 'status'):
                     query = query.filter(User.status == status_filter)
-                    print(f"📊 [USERS] Filtro de status aplicado: '{status_filter}'")
+                    print(f"[CHART] [USERS] Filtro de status aplicado: '{status_filter}'")
                 else:
-                    print(f"⚠️ [USERS] Modelo User não tem campo 'status', ignorando filtro")
+                    print(f"[WARNING] [USERS] Modelo User n�o tem campo 'status', ignorando filtro")
             except Exception as status_error:
-                print(f"⚠️ [USERS] Erro no filtro de status: {status_error}")
+                print(f"[WARNING] [USERS] Erro no filtro de status: {status_error}")
                 # Continuar sem filtro de status se houver erro
         
         # Contar total COM TRATAMENTO DE ERRO
         try:
             total_users = query.count()
         except Exception as count_error:
-            print(f"⚠️ [USERS] Erro ao contar usuários: {count_error}")
+            print(f"[WARNING] [USERS] Erro ao contar usu�rios: {count_error}")
             total_users = 0
         
-        # Aplicar paginação
+        # Aplicar pagina��o
         offset = (page - 1) * limit
         try:
             users = query.offset(offset).limit(limit).all()
         except Exception as query_error:
-            print(f"❌ [USERS] Erro na query de usuários: {query_error}")
+            print(f"[ERROR] [USERS] Erro na query de usu�rios: {query_error}")
             users = []
         
-        # Processar dados dos usuários COM TRATAMENTO DE ERRO
+        # Processar dados dos usu�rios COM TRATAMENTO DE ERRO
         users_data = []
         for user in users:
             try:
-                # Buscar carteira do usuário COM MÚLTIPLAS TENTATIVAS
+                # Buscar carteira do usu�rio COM M�LTIPLAS TENTATIVAS
                 wallet = None
                 wallet_data = {
                     "balance": 0.0,
@@ -4554,7 +4877,7 @@ def get_users():
                     if hasattr(user, 'id'):
                         wallet = session.query(Wallet).filter_by(user_id=user.id).first()
                     
-                    # Se não encontrar, tentar por user_email
+                    # Se n�o encontrar, tentar por user_email
                     if not wallet and hasattr(user, 'email'):
                         wallet = session.query(Wallet).filter_by(user_email=user.email).first()
                     
@@ -4567,9 +4890,9 @@ def get_users():
                         }
                         
                 except Exception as wallet_error:
-                    print(f"⚠️ [USERS] Erro ao buscar carteira do usuário {user.id}: {wallet_error}")
+                    print(f"[WARNING] [USERS] Erro ao buscar carteira do usu�rio {user.id}: {wallet_error}")
                 
-                # Buscar participações ativas COM TRATAMENTO DE ERRO
+                # Buscar participa��es ativas COM TRATAMENTO DE ERRO
                 active_participations = 0
                 try:
                     if hasattr(user, 'id'):
@@ -4583,9 +4906,9 @@ def get_users():
                             status='active'
                         ).count()
                 except Exception as participation_error:
-                    print(f"⚠️ [USERS] Erro ao buscar participações do usuário {user.id}: {participation_error}")
+                    print(f"[WARNING] [USERS] Erro ao buscar participa��es do usu�rio {user.id}: {participation_error}")
                 
-                # Buscar transações COM TRATAMENTO DE ERRO
+                # Buscar transa��es COM TRATAMENTO DE ERRO
                 total_transactions = 0
                 try:
                     if hasattr(user, 'id'):
@@ -4593,14 +4916,14 @@ def get_users():
                     elif hasattr(user, 'email'):
                         total_transactions = session.query(Transaction).filter_by(user_email=user.email).count()
                 except Exception as transaction_error:
-                    print(f"⚠️ [USERS] Erro ao buscar transações do usuário {user.id}: {transaction_error}")
+                    print(f"[WARNING] [USERS] Erro ao buscar transa��es do usu�rio {user.id}: {transaction_error}")
                 
-                # Montar dados do usuário COM VALORES PADRÃO
+                # Montar dados do usu�rio COM VALORES PADR�O
                 user_data = {
                     "id": getattr(user, 'id', 'unknown'),
-                    "name": getattr(user, 'name', 'Nome não informado') or "Nome não informado",
+                    "name": getattr(user, 'name', 'Nome n�o informado') or "Nome n�o informado",
                     "email": getattr(user, 'email', 'email@unknown.com'),
-                    "phone": getattr(user, 'phone', None) or "Não informado",
+                    "phone": getattr(user, 'phone', None) or "N�o informado",
                     "status": getattr(user, 'status', 'active') or "active",
                     "created_at": getattr(user, 'created_at', None).isoformat() if getattr(user, 'created_at', None) else None,
                     "last_login": getattr(user, 'last_login', None).isoformat() if getattr(user, 'last_login', None) else None,
@@ -4614,8 +4937,8 @@ def get_users():
                 users_data.append(user_data)
                 
             except Exception as user_error:
-                print(f"⚠️ [USERS] Erro ao processar usuário {getattr(user, 'id', 'unknown')}: {user_error}")
-                # Adicionar usuário com dados mínimos mesmo se houver erro
+                print(f"[WARNING] [USERS] Erro ao processar usu�rio {getattr(user, 'id', 'unknown')}: {user_error}")
+                # Adicionar usu�rio com dados m�nimos mesmo se houver erro
                 try:
                     users_data.append({
                         "id": getattr(user, 'id', f'error_{len(users_data)}'),
@@ -4629,9 +4952,9 @@ def get_users():
                         "stats": {"active_participations": 0, "total_transactions": 0, "kyc_status": "pending"}
                     })
                 except:
-                    pass  # Se nem isso funcionar, pular o usuário
+                    pass  # Se nem isso funcionar, pular o usu�rio
         
-        # Calcular paginação
+        # Calcular pagina��o
         total_pages = (total_users + limit - 1) // limit if total_users > 0 else 1
         
         result = {
@@ -4646,18 +4969,18 @@ def get_users():
             }
         }
         
-        print(f"✅ [USERS] Retornando {len(users_data)} usuários (página {page}/{total_pages})")
+        print(f"[OK] [USERS] Retornando {len(users_data)} usu�rios (p�gina {page}/{total_pages})")
         return jsonify(result)
         
     except Exception as e:
-        print(f"❌ [USERS] Erro geral ao buscar usuários: {e}")
+        print(f"[ERROR] [USERS] Erro geral ao buscar usu�rios: {e}")
         import traceback
-        print(f"❌ [USERS] Stack trace completo:")
+        print(f"[ERROR] [USERS] Stack trace completo:")
         traceback.print_exc()
         
         # Retornar resposta de erro estruturada
         return jsonify({
-            "error": f"Erro ao buscar usuários: {str(e)}",
+            "error": f"Erro ao buscar usu�rios: {str(e)}",
             "users": [],
             "pagination": {
                 "page": 1,
@@ -4677,37 +5000,37 @@ def get_users():
 
 @app.route('/api/users/<int:user_id>/status', methods=['PUT'])
 def update_user_status(user_id):
-    """Atualiza status do usuário"""
+    """Atualiza status do usu�rio"""
     session = SessionLocal()
     try:
         data = request.get_json()
         new_status = data.get('status')
         
         if not new_status:
-            return jsonify({"error": "Status é obrigatório"}), 400
+            return jsonify({"error": "Status � obrigat�rio"}), 400
         
-        print(f"👤 [USER] Atualizando status do usuário {user_id} para: {new_status}")
+        print(f"[USER] [USER] Atualizando status do usu�rio {user_id} para: {new_status}")
         
         user = session.query(User).filter_by(id=user_id).first()
         if not user:
-            return jsonify({"error": "Usuário não encontrado"}), 404
+            return jsonify({"error": "Usu�rio n�o encontrado"}), 404
         
         user.status = new_status
         session.commit()
         
-        print(f"✅ [USER] Status do usuário {user_id} atualizado para: {new_status}")
+        print(f"[OK] [USER] Status do usu�rio {user_id} atualizado para: {new_status}")
         return jsonify({"success": True, "message": "Status atualizado com sucesso"})
         
     except Exception as e:
         session.rollback()
-        print(f"❌ [USER] Erro ao atualizar status: {e}")
+        print(f"[ERROR] [USER] Erro ao atualizar status: {e}")
         return jsonify({"error": f"Erro ao atualizar status: {str(e)}"}), 500
     finally:
         session.close()
 
 @app.route('/api/users/<int:user_id>/balance', methods=['POST'])
 def add_user_balance(user_id):
-    """Adiciona saldo à carteira do usuário"""
+    """Adiciona saldo � carteira do usu�rio"""
     session = SessionLocal()
     try:
         data = request.get_json()
@@ -4716,12 +5039,12 @@ def add_user_balance(user_id):
         if amount <= 0:
             return jsonify({"error": "Valor deve ser maior que zero"}), 400
         
-        print(f"💰 [BALANCE] Adicionando R$ {amount:.2f} ao usuário {user_id}")
+        print(f"[MONEY] [BALANCE] Adicionando R$ {amount:.2f} ao usu�rio {user_id}")
         
-        # Buscar usuário
+        # Buscar usu�rio
         user = session.query(User).filter_by(id=user_id).first()
         if not user:
-            return jsonify({"error": "Usuário não encontrado"}), 404
+            return jsonify({"error": "Usu�rio n�o encontrado"}), 404
         
         # Buscar ou criar carteira
         wallet = session.query(Wallet).filter_by(user_id=user_id).first()
@@ -4739,7 +5062,7 @@ def add_user_balance(user_id):
         wallet.balance = float(wallet.balance or 0.0) + amount
         wallet.available = float(wallet.available or 0.0) + amount
         
-        # Criar transação
+        # Criar transa��o
         transaction = Transaction(
             user_id=user_id,
             type="bonus",
@@ -4751,7 +5074,7 @@ def add_user_balance(user_id):
         
         session.commit()
         
-        print(f"✅ [BALANCE] R$ {amount:.2f} adicionado ao usuário {user_id}")
+        print(f"[OK] [BALANCE] R$ {amount:.2f} adicionado ao usu�rio {user_id}")
         return jsonify({
             "success": True, 
             "message": f"R$ {amount:.2f} adicionado com sucesso",
@@ -4760,7 +5083,7 @@ def add_user_balance(user_id):
         
     except Exception as e:
         session.rollback()
-        print(f"❌ [BALANCE] Erro ao adicionar saldo: {e}")
+        print(f"[ERROR] [BALANCE] Erro ao adicionar saldo: {e}")
         return jsonify({"error": f"Erro ao adicionar saldo: {str(e)}"}), 500
     finally:
         session.close()
@@ -4780,7 +5103,7 @@ def handle_categories():
     
     if request.method == 'GET':
         try:
-            print("📂 [CATEGORIES] Buscando categorias PostgreSQL...")
+            print("[FOLDER] [CATEGORIES] Buscando categorias PostgreSQL...")
             
             # USAR POSTGRESQL DIRETAMENTE
             import psycopg2
@@ -4788,10 +5111,10 @@ def handle_categories():
             cursor = conn.cursor()
             
             # PRIMEIRO: Debug - Ver quantos desafios existem por categoria
-            print("🔍 [DEBUG] Verificando contagem na tabela challenges...")
+            print("[SEARCH] [DEBUG] Verificando contagem na tabela challenges...")
             cursor.execute('SELECT category, COUNT(*) as count FROM challenges GROUP BY category')
             debug_counts = cursor.fetchall()
-            print("📊 [DEBUG] Contagem real na tabela challenges:")
+            print("[CHART] [DEBUG] Contagem real na tabela challenges:")
             for row in debug_counts:
                 print(f"   - '{row[0]}': {row[1]} desafios")
             
@@ -4806,7 +5129,7 @@ def handle_categories():
             
             categories = []
             for row in cursor.fetchall():
-                # PostgreSQL retorna tuplas, não dicionários
+                # PostgreSQL retorna tuplas, n�o dicion�rios
                 category_id = row[0]
                 category_name = row[1]
                 description = row[2]
@@ -4816,10 +5139,10 @@ def handle_categories():
                 created_at = row[6]
                 updated_at = row[7]
                 
-                # Conversão correta do is_active para PostgreSQL
+                # Convers�o correta do is_active para PostgreSQL
                 is_active_bool = str(raw_is_active).lower() in ['true', '1', 't']
                 
-                # Mapeamento mais lógico baseado no nome
+                # Mapeamento mais l�gico baseado no nome
                 challenge_types = []
                 if category_name == 'Corrida':
                     challenge_types = ['running']
@@ -4831,19 +5154,19 @@ def handle_categories():
                     challenge_types = ['fitness']
                 elif category_name == 'Yoga':
                     challenge_types = ['calories']
-                elif category_name == 'Natação':
+                elif category_name == 'Nata��o':
                     challenge_types = ['swimming']
                 
                 # Contar desafios para esta categoria (CORRIGIDO PARA POSTGRESQL)
                 challenges_count = 0
                 if challenge_types:
-                    placeholders = ','.join(['%s' for _ in challenge_types])  # %s ao invés de ?
+                    placeholders = ','.join(['%s' for _ in challenge_types])  # %s ao inv�s de ?
                     count_query = f'SELECT COUNT(*) as count FROM challenges WHERE category = ANY(%s)'
                     cursor.execute(count_query, (challenge_types,))
                     count_result = cursor.fetchone()
                     challenges_count = count_result[0] if count_result else 0
                 
-                print(f"🏷️ [DEBUG] {category_name} -> tipos {challenge_types} -> {challenges_count} desafios")
+                print(f"[BUILDING] [DEBUG] {category_name} -> tipos {challenge_types} -> {challenges_count} desafios")
                 
                 categories.append({
                     'id': category_id,
@@ -4859,7 +5182,7 @@ def handle_categories():
             
             conn.close()
             
-            print(f"✅ [CATEGORIES] {len(categories)} categorias encontradas no PostgreSQL")
+            print(f"[OK] [CATEGORIES] {len(categories)} categorias encontradas no PostgreSQL")
             
             # Debug: mostrar o status de cada categoria
             for cat in categories:
@@ -4873,31 +5196,31 @@ def handle_categories():
             })
             
         except Exception as e:
-            print(f"❌ [CATEGORIES] Erro PostgreSQL: {e}")
+            print(f"[ERROR] [CATEGORIES] Erro PostgreSQL: {e}")
             import traceback
             traceback.print_exc()
             return jsonify({"error": f"Erro ao buscar categorias: {str(e)}"}), 500
     
     elif request.method == 'POST':
         try:
-            print("➕ [CATEGORIES] Criando nova categoria PostgreSQL...")
+            print("[PLUS] [CATEGORIES] Criando nova categoria PostgreSQL...")
             
             data = request.get_json()
             
-            # Validação
+            # Valida��o
             if not data.get('name') or not data.get('description'):
-                return jsonify({"error": "Nome e descrição são obrigatórios"}), 400
+                return jsonify({"error": "Nome e descri��o s�o obrigat�rios"}), 400
             
             # USAR POSTGRESQL DIRETAMENTE
             import psycopg2
             conn = psycopg2.connect(DATABASE_URL)
             cursor = conn.cursor()
             
-            # Verificar se já existe (CORRIGIDO PARA POSTGRESQL)
+            # Verificar se j� existe (CORRIGIDO PARA POSTGRESQL)
             cursor.execute('SELECT id FROM challenge_categories WHERE name = %s', (data['name'],))
             if cursor.fetchone():
                 conn.close()
-                return jsonify({"error": "Categoria com este nome já existe"}), 409
+                return jsonify({"error": "Categoria com este nome j� existe"}), 409
             
             # Inserir nova categoria (POSTGRESQL COM SERIAL/AUTO-INCREMENT)
             cursor.execute('''
@@ -4927,7 +5250,7 @@ def handle_categories():
                     'created_at': str(row[6]) if row[6] else None
                 }
                 
-                print(f"✅ [CATEGORIES] Categoria '{data['name']}' criada com ID {row[0]}")
+                print(f"[OK] [CATEGORIES] Categoria '{data['name']}' criada com ID {row[0]}")
                 return jsonify({
                     "success": True,
                     "message": "Categoria criada com sucesso",
@@ -4937,23 +5260,23 @@ def handle_categories():
                 return jsonify({"error": "Falha ao criar categoria"}), 500
             
         except Exception as e:
-            print(f"❌ [CATEGORIES] Erro ao criar categoria PostgreSQL: {e}")
+            print(f"[ERROR] [CATEGORIES] Erro ao criar categoria PostgreSQL: {e}")
             import traceback
             traceback.print_exc()
             return jsonify({"error": f"Erro ao criar categoria: {str(e)}"}), 500
             
 @app.route('/api/categories/<int:category_id>', methods=['PUT', 'DELETE'])
 def handle_category_by_id(category_id):
-    """Editar ou excluir categoria específica"""
+    """Editar ou excluir categoria espec�fica"""
     
     if request.method == 'PUT':
         try:
-            print(f"✏️ [CATEGORIES] Editando categoria ID {category_id}...")
+            print(f"[PENCIL] [CATEGORIES] Editando categoria ID {category_id}...")
             
             data = request.get_json()
             
             if not data.get('name') or not data.get('description'):
-                return jsonify({"error": "Nome e descrição são obrigatórios"}), 400
+                return jsonify({"error": "Nome e descri��o s�o obrigat�rios"}), 400
             
             conn = get_db_connection()
             cursor = conn.cursor()
@@ -4962,7 +5285,7 @@ def handle_category_by_id(category_id):
             cursor.execute('SELECT id FROM challenge_categories WHERE id = ?', (category_id,))
             if not cursor.fetchone():
                 conn.close()
-                return jsonify({"error": "Categoria não encontrada"}), 404
+                return jsonify({"error": "Categoria n�o encontrada"}), 404
             
             # Atualizar categoria
             cursor.execute('''
@@ -4984,19 +5307,19 @@ def handle_category_by_id(category_id):
             conn.commit()
             conn.close()
             
-            print(f"✅ [CATEGORIES] Categoria ID {category_id} atualizada")
+            print(f"[OK] [CATEGORIES] Categoria ID {category_id} atualizada")
             return jsonify({
                 "success": True,
                 "message": "Categoria atualizada com sucesso"
             })
             
         except Exception as e:
-            print(f"❌ [CATEGORIES] Erro ao atualizar categoria: {e}")
+            print(f"[ERROR] [CATEGORIES] Erro ao atualizar categoria: {e}")
             return jsonify({"error": f"Erro ao atualizar categoria: {str(e)}"}), 500
     
     elif request.method == 'DELETE':
         try:
-            print(f"🗑️ [CATEGORIES] Desativando categoria ID {category_id}...")
+            print(f"[STOP_SIGN] [CATEGORIES] Desativando categoria ID {category_id}...")
             
             conn = get_db_connection()
             cursor = conn.cursor()
@@ -5006,7 +5329,7 @@ def handle_category_by_id(category_id):
             category = cursor.fetchone()
             if not category:
                 conn.close()
-                return jsonify({"error": "Categoria não encontrada"}), 404
+                return jsonify({"error": "Categoria n�o encontrada"}), 404
             
             # Soft delete - marcar como inativa (0)
             cursor.execute('''
@@ -5022,14 +5345,14 @@ def handle_category_by_id(category_id):
             conn.commit()
             conn.close()
             
-            print(f"✅ [CATEGORIES] Categoria '{category['name']}' (ID {category_id}) desativada")
+            print(f"[OK] [CATEGORIES] Categoria '{category['name']}' (ID {category_id}) desativada")
             return jsonify({
                 "success": True,
                 "message": f"Categoria '{category['name']}' desativada com sucesso"
             })
             
         except Exception as e:
-            print(f"❌ [CATEGORIES] Erro ao desativar categoria: {e}")
+            print(f"[ERROR] [CATEGORIES] Erro ao desativar categoria: {e}")
             return jsonify({"error": f"Erro ao desativar categoria: {str(e)}"}), 500
 
 
@@ -5037,7 +5360,7 @@ def handle_category_by_id(category_id):
 def activate_category(category_id):
     """Reativar categoria inativa"""
     try:
-        print(f"🔄 [CATEGORIES] Reativando categoria ID {category_id}...")
+        print(f"[SYNC] [CATEGORIES] Reativando categoria ID {category_id}...")
         
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -5047,7 +5370,7 @@ def activate_category(category_id):
         category = cursor.fetchone()
         if not category:
             conn.close()
-            return jsonify({"error": "Categoria não encontrada"}), 404
+            return jsonify({"error": "Categoria n�o encontrada"}), 404
         
         # Reativar categoria (1)
         cursor.execute('''
@@ -5063,14 +5386,14 @@ def activate_category(category_id):
         conn.commit()
         conn.close()
         
-        print(f"✅ [CATEGORIES] Categoria '{category['name']}' (ID {category_id}) reativada")
+        print(f"[OK] [CATEGORIES] Categoria '{category['name']}' (ID {category_id}) reativada")
         return jsonify({
             "success": True,
             "message": f"Categoria '{category['name']}' reativada com sucesso"
         })
         
     except Exception as e:
-        print(f"❌ [CATEGORIES] Erro ao reativar categoria: {e}")
+        print(f"[ERROR] [CATEGORIES] Erro ao reativar categoria: {e}")
         return jsonify({"error": f"Erro ao reativar categoria: {str(e)}"}), 500
 
 
@@ -5080,7 +5403,7 @@ def activate_category(category_id):
 def get_active_categories():
     """Buscar apenas categorias ativas para uso no frontend"""
     try:
-        print("📂 [CATEGORIES] Buscando apenas categorias ativas...")
+        print("[FOLDER] [CATEGORIES] Buscando apenas categorias ativas...")
         
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -5103,14 +5426,14 @@ def get_active_categories():
                 'description': row['description'],
                 'color': row['color'],
                 'icon': row['icon'],
-                'is_active': True,  # Sempre true pois só buscamos ativas
+                'is_active': True,  # Sempre true pois s� buscamos ativas
                 'created_at': row['created_at'],
                 'updated_at': row['updated_at']
             })
         
         conn.close()
         
-        print(f"✅ [CATEGORIES] {len(categories)} categorias ativas encontradas")
+        print(f"[OK] [CATEGORIES] {len(categories)} categorias ativas encontradas")
         return jsonify({
             "success": True,
             "categories": categories,
@@ -5118,7 +5441,7 @@ def get_active_categories():
         })
         
     except Exception as e:
-        print(f"❌ [CATEGORIES] Erro ao buscar categorias ativas: {e}")
+        print(f"[ERROR] [CATEGORIES] Erro ao buscar categorias ativas: {e}")
         return jsonify({"error": f"Erro ao buscar categorias ativas: {str(e)}"}), 500
 
 
@@ -5129,7 +5452,7 @@ def health_check():
     """Health check endpoint"""
     return jsonify({
         'status': 'ok',
-        'message': 'BetFit API está funcionando',
+        'message': 'BetFit API est� funcionando',
         'timestamp': datetime.utcnow().isoformat(),
         'endpoints': [
             '/api/auth/register',
@@ -5156,7 +5479,7 @@ def health_check():
 
 @app.route('/api/tunnel-health', methods=['GET', 'OPTIONS'])
 def tunnel_health():
-    """Health check específico para túneis"""
+    """Health check espec�fico para t�neis"""
     if request.method == 'OPTIONS':
         return '', 200
     
@@ -5174,13 +5497,13 @@ def tunnel_health():
 
 @app.route('/api/test-connection', methods=['GET', 'POST', 'OPTIONS'])
 def test_connection():
-    """Endpoint para testar conectividade do túnel"""
+    """Endpoint para testar conectividade do t�nel"""
     if request.method == 'OPTIONS':
         return '', 200
     
     return jsonify({
         'success': True,
-        'message': 'Conexão funcionando!',
+        'message': 'Conex�o funcionando!',
         'method': request.method,
         'headers': dict(request.headers),
         'timestamp': datetime.utcnow().isoformat(),
@@ -5190,7 +5513,7 @@ def test_connection():
 
 @app.after_request
 def after_request(response):
-    """Middleware CORS otimizado para túneis"""
+    """Middleware CORS otimizado para t�neis"""
     origin = request.headers.get('Origin')
     
     # Permitir origens do .env
@@ -5198,7 +5521,7 @@ def after_request(response):
         response.headers['Access-Control-Allow-Origin'] = origin
         response.headers['Access-Control-Allow-Credentials'] = 'true'
     
-    # Headers para túneis
+    # Headers para t�neis
     if os.getenv('BYPASS_TUNNEL_REMINDER'):
         response.headers['bypass-tunnel-reminder'] = '1'
     
@@ -5209,11 +5532,11 @@ def after_request(response):
     return response
 
 
-# ENDPOINT DE DIAGNÓSTICO PARA ADICIONAR NO MAIN.PY
-# Este endpoint vai mostrar exatamente o que está acontecendo
+# ENDPOINT DE DIAGN�STICO PARA ADICIONAR NO MAIN.PY
+# Este endpoint vai mostrar exatamente o que est� acontecendo
 
 # ENDPOINT FINAL CORRIGIDO PARA MAIN.PY
-# Este endpoint retorna os dados REAIS do banco, não dados mock
+# Este endpoint retorna os dados REAIS do banco, n�o dados mock
 
 @app.route('/api/admin/challenges/real-fixed', methods=['GET'])
 def get_real_challenges_fixed():
@@ -5240,14 +5563,14 @@ def get_real_challenges_fixed():
         if not db_path:
             return jsonify({
                 'success': False,
-                'error': 'Banco de dados não encontrado',
+                'error': 'Banco de dados n�o encontrado',
                 'challenges': [],
                 'total_challenges': 0,
                 'total_participants': 0,
                 'total_pool': 0.0
             }), 404
         
-        print(f"🔍 [REAL-FIXED] Usando banco: {db_path}")
+        print(f"[SEARCH] [REAL-FIXED] Usando banco: {db_path}")
         
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
@@ -5258,9 +5581,9 @@ def get_real_challenges_fixed():
         columns_info = cursor.fetchall()
         available_columns = [col[1] for col in columns_info]
         
-        print(f"🔍 [REAL-FIXED] Colunas disponíveis na tabela challenges: {available_columns}")
+        print(f"[SEARCH] [REAL-FIXED] Colunas dispon�veis na tabela challenges: {available_columns}")
         
-        # SEGUNDO: Montar consulta baseada nas colunas disponíveis
+        # SEGUNDO: Montar consulta baseada nas colunas dispon�veis
         base_columns = ['c.id', 'c.title', 'c.description']
         optional_columns = []
         
@@ -5308,12 +5631,12 @@ def get_real_challenges_fixed():
             ORDER BY c.id
         """
         
-        print(f"🔍 [REAL-FIXED] Consulta SQL: {sql_query}")
+        print(f"[SEARCH] [REAL-FIXED] Consulta SQL: {sql_query}")
         
         cursor.execute(sql_query)
         challenges_rows = cursor.fetchall()
         
-        # Converter para lista de dicionários
+        # Converter para lista de dicion�rios
         challenges_data = []
         for row in challenges_rows:
             challenge_dict = {
@@ -5333,7 +5656,7 @@ def get_real_challenges_fixed():
                 'target_unit': row.get('target_unit', 'km'),
                 'stake_min': float(row.get('stake_min', 0)) if row.get('stake_min') else 0.0,
                 'stake_max': float(row.get('stake_max', 0)) if row.get('stake_max') else 0.0,
-                # Dados de participação REAIS
+                # Dados de participa��o REAIS
                 'participants_count': row['participants_count'],
                 'current_participants': row['participants_count'],
                 'total_pool': float(row['total_pool'])
@@ -5341,7 +5664,7 @@ def get_real_challenges_fixed():
             
             challenges_data.append(challenge_dict)
             
-            print(f"✅ [REAL-FIXED] Desafio ID {row['id']}: '{row['title']}' - {row['participants_count']} participações, R$ {row['total_pool']:.2f}")
+            print(f"[OK] [REAL-FIXED] Desafio ID {row['id']}: '{row['title']}' - {row['participants_count']} participa��es, R$ {row['total_pool']:.2f}")
         
         conn.close()
         
@@ -5350,10 +5673,10 @@ def get_real_challenges_fixed():
         total_pool = sum(c['total_pool'] for c in challenges_data)
         active_challenges = len([c for c in challenges_data if c['status'] == 'active'])
         
-        print(f"📊 [REAL-FIXED] TOTAIS REAIS:")
+        print(f"[CHART] [REAL-FIXED] TOTAIS REAIS:")
         print(f"  - {len(challenges_data)} desafios")
         print(f"  - {active_challenges} desafios ativos")
-        print(f"  - {total_participants} participações")
+        print(f"  - {total_participants} participa��es")
         print(f"  - R$ {total_pool:.2f} em pools")
         
         return jsonify({
@@ -5363,7 +5686,7 @@ def get_real_challenges_fixed():
             'active_challenges': active_challenges,
             'total_participants': total_participants,
             'total_pool': total_pool,
-            'message': f'{len(challenges_data)} desafios reais encontrados com {total_participants} participações',
+            'message': f'{len(challenges_data)} desafios reais encontrados com {total_participants} participa��es',
             'data_source': 'real_database_fixed',
             'database_path': db_path,
             'available_columns': available_columns,
@@ -5374,7 +5697,7 @@ def get_real_challenges_fixed():
         })
         
     except Exception as e:
-        print(f"❌ [REAL-FIXED] Erro ao buscar desafios reais: {e}")
+        print(f"[ERROR] [REAL-FIXED] Erro ao buscar desafios reais: {e}")
         import traceback
         traceback.print_exc()
         
@@ -5389,10 +5712,10 @@ def get_real_challenges_fixed():
         }), 500
 
 
-# ENDPOINT AINDA MAIS SIMPLES - APENAS COLUNAS BÁSICAS
+# ENDPOINT AINDA MAIS SIMPLES - APENAS COLUNAS B�SICAS
 @app.route('/api/admin/challenges/simple-real', methods=['GET'])
 def get_simple_real_challenges():
-    """Endpoint super simples que usa apenas colunas básicas"""
+    """Endpoint super simples que usa apenas colunas b�sicas"""
     try:
         import sqlite3
         import os
@@ -5415,7 +5738,7 @@ def get_simple_real_challenges():
         if not db_path:
             return jsonify({
                 'success': False,
-                'error': 'Banco não encontrado',
+                'error': 'Banco n�o encontrado',
                 'challenges': []
             }), 404
         
@@ -5446,9 +5769,9 @@ def get_simple_real_challenges():
                 'id': row['id'],
                 'title': row['title'],
                 'description': row['description'],
-                'category': 'Fitness',  # Valor padrão
+                'category': 'Fitness',  # Valor padr�o
                 'category_name': 'Fitness',
-                'status': 'active',  # Valor padrão
+                'status': 'active',  # Valor padr�o
                 'participants_count': row['participants_count'],
                 'current_participants': row['participants_count'],
                 'total_pool': float(row['total_pool']),
@@ -5462,7 +5785,7 @@ def get_simple_real_challenges():
             
             challenges_data.append(challenge_dict)
             
-            print(f"✅ [SIMPLE] Desafio ID {row['id']}: '{row['title']}' - {row['participants_count']} participações")
+            print(f"[OK] [SIMPLE] Desafio ID {row['id']}: '{row['title']}' - {row['participants_count']} participa��es")
         
         conn.close()
         
@@ -5470,7 +5793,7 @@ def get_simple_real_challenges():
         total_participants = sum(c['participants_count'] for c in challenges_data)
         total_pool = sum(c['total_pool'] for c in challenges_data)
         
-        print(f"📊 [SIMPLE] TOTAIS: {total_participants} participações, R$ {total_pool:.2f}")
+        print(f"[CHART] [SIMPLE] TOTAIS: {total_participants} participa��es, R$ {total_pool:.2f}")
         
         return jsonify({
             'success': True,
@@ -5484,7 +5807,7 @@ def get_simple_real_challenges():
         })
         
     except Exception as e:
-        print(f"❌ [SIMPLE] Erro: {e}")
+        print(f"[ERROR] [SIMPLE] Erro: {e}")
         return jsonify({
             'success': False,
             'error': str(e),
@@ -5496,10 +5819,10 @@ def get_simple_real_challenges():
 def get_challenges_real_database():
     """
     Endpoint que retorna dados 100% REAIS do banco de dados SQLite
-    SEM DEPENDER DE DATABASE_PATH - USA CAMINHO AUTOMÁTICO
+    SEM DEPENDER DE DATABASE_PATH - USA CAMINHO AUTOM�TICO
     """
     try:
-        print("🔍 [REAL-DATABASE] Buscando dados 100% reais do banco SQLite...")
+        print("[SEARCH] [REAL-DATABASE] Buscando dados 100% reais do banco SQLite...")
         
         # TENTAR DIFERENTES CAMINHOS PARA O BANCO DE DADOS
         possible_db_paths = [
@@ -5518,13 +5841,13 @@ def get_challenges_real_database():
         for path in possible_db_paths:
             if os.path.exists(path):
                 db_path = path
-                print(f"✅ [REAL-DATABASE] Banco encontrado em: {path}")
+                print(f"[OK] [REAL-DATABASE] Banco encontrado em: {path}")
                 break
         
         if not db_path:
-            # CRIAR BANCO TEMPORÁRIO SE NÃO ENCONTRAR
+            # CRIAR BANCO TEMPOR�RIO SE N�O ENCONTRAR
             db_path = 'betfit.db'
-            print(f"⚠️ [REAL-DATABASE] Banco não encontrado, usando: {db_path}")
+            print(f"[WARNING] [REAL-DATABASE] Banco n�o encontrado, usando: {db_path}")
         
         # Conectar ao banco SQLite
         conn = sqlite3.connect(db_path)
@@ -5534,11 +5857,11 @@ def get_challenges_real_database():
         # VERIFICAR SE AS TABELAS EXISTEM
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='challenges'")
         if not cursor.fetchone():
-            print("❌ [REAL-DATABASE] Tabela 'challenges' não existe")
+            print("[ERROR] [REAL-DATABASE] Tabela 'challenges' n�o existe")
             conn.close()
             return jsonify({
                 'success': False,
-                'error': 'Tabela challenges não encontrada no banco de dados',
+                'error': 'Tabela challenges n�o encontrada no banco de dados',
                 'challenges': [],
                 'total_challenges': 0,
                 'total_participants': 0,
@@ -5549,11 +5872,11 @@ def get_challenges_real_database():
         
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='challenge_participations'")
         if not cursor.fetchone():
-            print("❌ [REAL-DATABASE] Tabela 'challenge_participations' não existe")
+            print("[ERROR] [REAL-DATABASE] Tabela 'challenge_participations' n�o existe")
             conn.close()
             return jsonify({
                 'success': False,
-                'error': 'Tabela challenge_participations não encontrada no banco de dados',
+                'error': 'Tabela challenge_participations n�o encontrada no banco de dados',
                 'challenges': [],
                 'total_challenges': 0,
                 'total_participants': 0,
@@ -5562,8 +5885,8 @@ def get_challenges_real_database():
                 'database_path': db_path
             })
         
-        # CONSULTA 1: Buscar todos os desafios com participações REAIS
-        print("📊 [REAL-DATABASE] Executando consulta SQL para desafios...")
+        # CONSULTA 1: Buscar todos os desafios com participa��es REAIS
+        print("[CHART] [REAL-DATABASE] Executando consulta SQL para desafios...")
         cursor.execute("""
             SELECT 
                 c.id,
@@ -5586,22 +5909,22 @@ def get_challenges_real_database():
         """)
         
         challenges_rows = cursor.fetchall()
-        print(f"✅ [REAL-DATABASE] {len(challenges_rows)} desafios encontrados no banco")
+        print(f"[OK] [REAL-DATABASE] {len(challenges_rows)} desafios encontrados no banco")
         
-        # CONSULTA 2: Contar TODAS as participações no banco
-        print("📊 [REAL-DATABASE] Contando participações totais...")
+        # CONSULTA 2: Contar TODAS as participa��es no banco
+        print("[CHART] [REAL-DATABASE] Contando participa��es totais...")
         cursor.execute("SELECT COUNT(*) as total FROM challenge_participations")
         total_participations_row = cursor.fetchone()
         total_participations = total_participations_row['total'] if total_participations_row else 0
         
         # CONSULTA 3: Somar TODOS os valores de stake
-        print("💰 [REAL-DATABASE] Somando valores de stake...")
+        print("[MONEY] [REAL-DATABASE] Somando valores de stake...")
         cursor.execute("SELECT COALESCE(SUM(stake_amount), 0) as total_pool FROM challenge_participations")
         total_pool_row = cursor.fetchone()
         total_pool = float(total_pool_row['total_pool']) if total_pool_row else 0.0
         
         # CONSULTA 4: Contar desafios ativos
-        print("🎯 [REAL-DATABASE] Contando desafios ativos...")
+        print("[TARGET] [REAL-DATABASE] Contando desafios ativos...")
         cursor.execute("SELECT COUNT(*) as active FROM challenges WHERE status = 'active' OR status IS NULL")
         active_challenges_row = cursor.fetchone()
         active_challenges = active_challenges_row['active'] if active_challenges_row else 0
@@ -5622,14 +5945,14 @@ def get_challenges_real_database():
                 'participants_count': row['participants_count'],
                 'current_participants': row['participants_count'],  # Alias para compatibilidade
                 'total_pool': float(row['total_pool']),
-                'category': 'Fitness',  # Valor padrão
-                'category_name': 'Fitness',  # Valor padrão
+                'category': 'Fitness',  # Valor padr�o
+                'category_name': 'Fitness',  # Valor padr�o
                 'end_at': row['end_at'],
                 'created_at': row['created_at']
             }
             challenges_data.append(challenge_data)
             
-            print(f"  - ID {challenge_data['id']}: '{challenge_data['title']}' → {challenge_data['participants_count']} participações, R$ {challenge_data['total_pool']:.2f}")
+            print(f"  - ID {challenge_data['id']}: '{challenge_data['title']}' -> {challenge_data['participants_count']} participa��es, R$ {challenge_data['total_pool']:.2f}")
         
         conn.close()
         
@@ -5647,17 +5970,17 @@ def get_challenges_real_database():
             'database_path': db_path
         }
         
-        print(f"📊 [REAL-DATABASE] TOTAIS REAIS:")
+        print(f"[CHART] [REAL-DATABASE] TOTAIS REAIS:")
         print(f"  - Total de desafios: {len(challenges_data)}")
         print(f"  - Desafios ativos: {active_challenges}")
-        print(f"  - Total de participações: {total_participations}")
+        print(f"  - Total de participa��es: {total_participations}")
         print(f"  - Pool total: R$ {total_pool:.2f}")
-        print(f"✅ [REAL-DATABASE] Dados 100% reais retornados com sucesso!")
+        print(f"[OK] [REAL-DATABASE] Dados 100% reais retornados com sucesso!")
         
         return jsonify(response_data)
         
     except Exception as e:
-        print(f"❌ [REAL-DATABASE] Erro ao buscar dados reais: {str(e)}")
+        print(f"[ERROR] [REAL-DATABASE] Erro ao buscar dados reais: {str(e)}")
         import traceback
         traceback.print_exc()
         
@@ -5686,7 +6009,7 @@ def get_challenges_simple_fallback():
                 {
                     'id': 1,
                     'title': 'Corrida 5km em 30 minutos',
-                    'description': 'Complete uma corrida de 5km em no máximo 30 minutos',
+                    'description': 'Complete uma corrida de 5km em no m�ximo 30 minutos',
                     'status': 'active',
                     'target_value': 5.0,
                     'target_unit': 'km',
@@ -5702,7 +6025,7 @@ def get_challenges_simple_fallback():
                 {
                     'id': 2,
                     'title': 'Ciclismo 20km',
-                    'description': 'Pedale 20km em uma única sessão',
+                    'description': 'Pedale 20km em uma �nica sess�o',
                     'status': 'active',
                     'target_value': 20.0,
                     'target_unit': 'km',
@@ -5717,8 +6040,8 @@ def get_challenges_simple_fallback():
                 },
                 {
                     'id': 3,
-                    'title': '100 Flexões em um dia',
-                    'description': 'Faça 100 flexões ao longo do dia',
+                    'title': '100 Flex�es em um dia',
+                    'description': 'Fa�a 100 flex�es ao longo do dia',
                     'status': 'active',
                     'target_value': 100.0,
                     'target_unit': 'reps',
@@ -5733,7 +6056,7 @@ def get_challenges_simple_fallback():
                 },
                 {
                     'id': 4,
-                    'title': '10.000 passos diários',
+                    'title': '10.000 passos di�rios',
                     'description': 'Caminhe 10.000 passos em um dia',
                     'status': 'active',
                     'target_value': 10000.0,
@@ -5810,7 +6133,7 @@ def debug_database_structure():
         cursor.execute("SELECT COUNT(*) FROM challenge_participations")
         participations_count = cursor.fetchone()[0]
         
-        # Buscar algumas participações de exemplo
+        # Buscar algumas participa��es de exemplo
         cursor.execute("SELECT * FROM challenge_participations LIMIT 5")
         sample_participations = cursor.fetchall()
         
@@ -5841,16 +6164,16 @@ def debug_database_structure():
             'error': str(e)
         }), 500
 
-# ENDPOINT PARA FORÇAR REFRESH DOS DADOS
+# ENDPOINT PARA FOR�AR REFRESH DOS DADOS
 @app.route('/api/admin/challenges/force-refresh', methods=['POST'])
 def force_refresh_challenges():
     """
-    Endpoint para forçar atualização dos dados do banco
+    Endpoint para for�ar atualiza��o dos dados do banco
     """
     try:
-        print("🔄 [FORCE-REFRESH] Forçando atualização dos dados...")
+        print("[SYNC] [FORCE-REFRESH] For�ando atualiza��o dos dados...")
         
-        # Aqui você pode adicionar lógica para limpar cache se houver
+        # Aqui voc� pode adicionar l�gica para limpar cache se houver
         # Por enquanto, apenas retorna sucesso para indicar que deve recarregar
         
         return jsonify({
@@ -5866,19 +6189,19 @@ def force_refresh_challenges():
             'error': str(e)
         }), 500
 
-# ==================== CONFIGURAÇÕES DE PAGAMENTO ====================
+# ==================== CONFIGURA��ES DE PAGAMENTO ====================
 
 @app.route('/api/admin/payments/settings', methods=['GET'])
 def get_payment_settings():
-    """Obter configurações de pagamento do banco SQLite - VERSÃO CORRIGIDA"""
+    """Obter configura��es de pagamento do banco SQLite - VERS�O CORRIGIDA"""
     try:
         conn = psycopg2.connect(DATABASE_URL)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
-        print("💳 [PAYMENTS] Buscando configurações de pagamento...")
+        print("[CREDIT_CARD] [PAYMENTS] Buscando configura��es de pagamento...")
         
-        # NOVA CONSULTA: Buscar configurações por provedor
+        # NOVA CONSULTA: Buscar configura��es por provedor
         cursor.execute("""
             SELECT 
                 ps.id as setting_id,
@@ -5920,7 +6243,7 @@ def get_payment_settings():
         
         webhooks_rows = cursor.fetchall()
         
-        # NOVA CONSULTA: Buscar métodos de pagamento
+        # NOVA CONSULTA: Buscar m�todos de pagamento
         cursor.execute("""
             SELECT 
                 pm.payment_setting_id,
@@ -5937,7 +6260,7 @@ def get_payment_settings():
         
         conn.close()
         
-        print(f"📊 [PAYMENTS] Dados encontrados:")
+        print(f"[CHART] [PAYMENTS] Dados encontrados:")
         print(f"  - Settings: {len(settings_rows)}")
         print(f"  - Credentials: {len(credentials_rows)}")
         print(f"  - Webhooks: {len(webhooks_rows)}")
@@ -5946,7 +6269,7 @@ def get_payment_settings():
         # Organizar dados por provedor
         settings = {}
         
-        # Processar configurações básicas
+        # Processar configura��es b�sicas
         for row in settings_rows:
             provider = row['provider']
             environment = row['environment']
@@ -5958,7 +6281,7 @@ def get_payment_settings():
                     'fee_percentage': float(row['fee_percentage'] or 0)
                 }
                 
-                # Configurações específicas do MercadoPago
+                # Configura��es espec�ficas do MercadoPago
                 if provider == 'mercadopago':
                     settings[provider].update({
                         'environment': environment or 'sandbox',
@@ -5980,7 +6303,7 @@ def get_payment_settings():
             key = row['credential_key']
             value = row['credential_value']
             
-            # Mascarar valores sensíveis
+            # Mascarar valores sens�veis
             if any(word in key.lower() for word in ['secret', 'token', 'password']):
                 if value and len(value) > 8:
                     display_value = value[:4] + '***' + value[-4:]
@@ -6013,7 +6336,7 @@ def get_payment_settings():
             
             print(f"  - {provider}.{environment}.webhook_url: {webhook_url}")
         
-        # Processar métodos de pagamento
+        # Processar m�todos de pagamento
         for row in methods_rows:
             provider = row['provider']
             method_type = row['method_type']
@@ -6029,7 +6352,7 @@ def get_payment_settings():
             
             print(f"  - {provider}.{method_type}: enabled={enabled}")
         
-        # Garantir que todos os provedores existam (com dados padrão se necessário)
+        # Garantir que todos os provedores existam (com dados padr�o se necess�rio)
         default_providers = {
             "pix": {
                 "enabled": False,
@@ -6065,17 +6388,17 @@ def get_payment_settings():
             }
         }
         
-        # Mesclar dados padrão com dados reais
+        # Mesclar dados padr�o com dados reais
         for provider, default_config in default_providers.items():
             if provider not in settings:
                 settings[provider] = default_config
             else:
-                # Garantir que campos obrigatórios existam
+                # Garantir que campos obrigat�rios existam
                 for key, default_value in default_config.items():
                     if key not in settings[provider]:
                         settings[provider][key] = default_value
         
-        print(f"✅ [PAYMENTS] Configurações finais organizadas: {list(settings.keys())}")
+        print(f"[OK] [PAYMENTS] Configura��es finais organizadas: {list(settings.keys())}")
         
         return jsonify({
             "success": True,
@@ -6089,7 +6412,7 @@ def get_payment_settings():
         }), 200
         
     except Exception as e:
-        print(f"❌ [PAYMENTS] Erro ao obter configurações: {str(e)}")
+        print(f"[ERROR] [PAYMENTS] Erro ao obter configura��es: {str(e)}")
         import traceback
         traceback.print_exc()
         
@@ -6112,15 +6435,15 @@ def get_payment_settings():
 
 @app.route('/api/admin/payments/transactions', methods=['GET'])
 def get_transactions():
-    """Obter transações de pagamento do banco SQLite"""
+    """Obter transa��es de pagamento do banco SQLite"""
     try:
         conn = psycopg2.connect(DATABASE_URL)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
-        print("💳 [PAYMENTS] Buscando transações de pagamento...")
+        print("[CREDIT_CARD] [PAYMENTS] Buscando transa��es de pagamento...")
         
-        # Buscar transações de pagamento recentes
+        # Buscar transa��es de pagamento recentes
         cursor.execute("""
             SELECT 
                 pt.id,
@@ -6140,13 +6463,13 @@ def get_transactions():
         rows = cursor.fetchall()
         conn.close()
         
-        # Processar transações
+        # Processar transa��es
         transactions = []
         for row in rows:
             transactions.append({
                 "id": row['id'],
                 "type": row['type'],
-                "user_name": row['user_name'] or "Usuário Desconhecido",
+                "user_name": row['user_name'] or "Usu�rio Desconhecido",
                 "user_email": row['user_email'] or "unknown@email.com",
                 "amount": float(row['amount'] or 0),
                 "method": row['method'] or "unknown",
@@ -6154,13 +6477,13 @@ def get_transactions():
                 "created_at": row['created_at'] or datetime.now().isoformat()
             })
         
-        # Se não houver dados reais, usar dados de exemplo
+        # Se n�o houver dados reais, usar dados de exemplo
         if not transactions:
             transactions = [
                 {
                     "id": "1",
                     "type": "deposit",
-                    "user_name": "João Silva",
+                    "user_name": "Jo�o Silva",
                     "user_email": "joao@example.com",
                     "amount": 150.00,
                     "method": "pix",
@@ -6179,14 +6502,14 @@ def get_transactions():
                 }
             ]
         
-        print(f"✅ [PAYMENTS] {len(transactions)} transações encontradas")
+        print(f"[OK] [PAYMENTS] {len(transactions)} transa��es encontradas")
         return jsonify({
             "success": True,
             "transactions": transactions
         }), 200
         
     except Exception as e:
-        print(f"❌ [PAYMENTS] Erro ao obter transações: {str(e)}")
+        print(f"[ERROR] [PAYMENTS] Erro ao obter transa��es: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e)
@@ -6194,14 +6517,14 @@ def get_transactions():
 
 @app.route('/api/admin/payments/methods/<method>/toggle', methods=['PUT'])
 def toggle_payment_method(method):
-    """Alternar status de método de pagamento no banco SQLite"""
+    """Alternar status de m�todo de pagamento no banco SQLite"""
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
         
-        print(f"🔄 [PAYMENTS] Alternando status do método: {method}")
+        print(f"[SYNC] [PAYMENTS] Alternando status do m�todo: {method}")
         
-        # Buscar configuração atual
+        # Buscar configura��o atual
         cursor.execute("""
             SELECT id, enabled FROM payment_settings 
             WHERE provider = ? AND environment = 'sandbox'
@@ -6218,7 +6541,7 @@ def toggle_payment_method(method):
                 WHERE id = ?
             """, (new_status, row[0]))
         else:
-            # Criar nova configuração
+            # Criar nova configura��o
             cursor.execute("""
                 INSERT INTO payment_settings (provider, enabled, environment, fee_percentage)
                 VALUES (?, 1, 'sandbox', 0.0)
@@ -6227,15 +6550,15 @@ def toggle_payment_method(method):
         conn.commit()
         conn.close()
         
-        print(f"✅ [PAYMENTS] Método {method} alternado com sucesso")
+        print(f"[OK] [PAYMENTS] M�todo {method} alternado com sucesso")
         return jsonify({
             "success": True,
             "method": method,
-            "message": f"Método {method} alternado com sucesso"
+            "message": f"M�todo {method} alternado com sucesso"
         }), 200
         
     except Exception as e:
-        print(f"❌ [PAYMENTS] Erro ao alternar método {method}: {str(e)}")
+        print(f"[ERROR] [PAYMENTS] Erro ao alternar m�todo {method}: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e)
@@ -6243,14 +6566,14 @@ def toggle_payment_method(method):
 
 @app.route('/api/admin/payments/settings/<method>', methods=['PUT'])
 def update_payment_settings(method):
-    """Atualizar configurações de método de pagamento no banco SQLite"""
+    """Atualizar configura��es de m�todo de pagamento no banco SQLite"""
     try:
         data = request.get_json()
         
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
         
-        print(f"💾 [PAYMENTS] Salvando configurações do {method}:", data)
+        print(f"[DB] [PAYMENTS] Salvando configura��es do {method}:", data)
         
         # Determinar ambiente (para MercadoPago)
         environment = data.get('environment', 'sandbox')
@@ -6265,14 +6588,14 @@ def update_payment_settings(method):
         
         if row:
             setting_id = row[0]
-            # Atualizar configuração existente
+            # Atualizar configura��o existente
             cursor.execute("""
                 UPDATE payment_settings 
                 SET fee_percentage = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             """, (data.get('fee_percentage', 0), setting_id))
         else:
-            # Criar nova configuração
+            # Criar nova configura��o
             cursor.execute("""
                 INSERT INTO payment_settings (provider, environment, enabled, fee_percentage)
                 VALUES (?, ?, 1, ?)
@@ -6314,7 +6637,7 @@ def update_payment_settings(method):
                 VALUES (?, ?, 1, CURRENT_TIMESTAMP)
             """, (setting_id, webhook_url))
         
-        # Salvar métodos de pagamento (para MercadoPago)
+        # Salvar m�todos de pagamento (para MercadoPago)
         if method == 'mercadopago':
             payment_methods = ['pix_enabled', 'credit_card_enabled', 'debit_card_enabled', 'installments_enabled']
             for pm in payment_methods:
@@ -6334,16 +6657,16 @@ def update_payment_settings(method):
         conn.commit()
         conn.close()
         
-        print(f"✅ [PAYMENTS] Configurações do {method} salvas no banco")
+        print(f"[OK] [PAYMENTS] Configura��es do {method} salvas no banco")
         return jsonify({
             "success": True,
             "method": method,
             "settings": data,
-            "message": f"Configurações do {method} salvas com sucesso"
+            "message": f"Configura��es do {method} salvas com sucesso"
         }), 200
         
     except Exception as e:
-        print(f"❌ [PAYMENTS] Erro ao salvar configurações do {method}: {str(e)}")
+        print(f"[ERROR] [PAYMENTS] Erro ao salvar configura��es do {method}: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -6355,49 +6678,49 @@ def update_payment_settings(method):
 
 @app.route('/api/admin/payments/settings', methods=['OPTIONS'])
 def payment_settings_options():
-    """Handler OPTIONS para configurações de pagamento"""
+    """Handler OPTIONS para configura��es de pagamento"""
     return '', 200
 
 @app.route('/api/admin/payments/transactions', methods=['OPTIONS'])
 def transactions_options():
-    """Handler OPTIONS para transações de pagamento"""
+    """Handler OPTIONS para transa��es de pagamento"""
     return '', 200
 
 @app.route('/api/admin/payments/methods/<method>/toggle', methods=['OPTIONS'])
 def toggle_payment_method_options(method):
-    """Handler OPTIONS para alternar método de pagamento"""
+    """Handler OPTIONS para alternar m�todo de pagamento"""
     return '', 200
 
 @app.route('/api/admin/payments/settings/<method>', methods=['OPTIONS'])
 def update_payment_settings_options(method):
-    """Handler OPTIONS para atualizar configurações"""
+    """Handler OPTIONS para atualizar configura��es"""
     return '', 200
 
-# ==================== FUNÇÃO AUXILIAR ====================
+# ==================== FUN��O AUXILIAR ====================
 
 def encrypt_credential(value):
-    """Função simples para criptografar credenciais (você pode melhorar isso)"""
+    """Fun��o simples para criptografar credenciais (voc� pode melhorar isso)"""
     import base64
     return base64.b64encode(value.encode()).decode()
 
 def decrypt_credential(encrypted_value):
-    """Função simples para descriptografar credenciais"""
+    """Fun��o simples para descriptografar credenciais"""
     import base64
     try:
         return base64.b64decode(encrypted_value.encode()).decode()
     except:
-        return encrypted_value  # Retorna original se não conseguir descriptografar
+        return encrypted_value  # Retorna original se n�o conseguir descriptografar
 
-# ==================== ATUALIZAR MENSAGEM DE INICIALIZAÇÃO ====================
-# Adicione essas linhas no final do print de inicialização do main():
+# ==================== ATUALIZAR MENSAGEM DE INICIALIZA��O ====================
+# Adicione essas linhas no final do print de inicializa��o do main():
 
-print("💳 Rotas de pagamento disponíveis:")
+print("[CREDIT_CARD] Rotas de pagamento dispon�veis:")
 print("   - GET /api/admin/payments/settings")
 print("   - GET /api/admin/payments/transactions") 
 print("   - PUT /api/admin/payments/methods/<method>/toggle")
 print("   - PUT /api/admin/payments/settings/<method>")
-print("💳 Métodos suportados: PIX, MercadoPago, Stripe, PayPal")
-print("🔒 Configurações salvas no banco SQLite com segurança")
+print("[CREDIT_CARD] M�todos suportados: PIX, MercadoPago, Stripe, PayPal")
+print("[LOCKED] Configura��es salvas no banco SQLite com seguran�a")
 
 
 
@@ -6407,46 +6730,46 @@ print("🔒 Configurações salvas no banco SQLite com segurança")
 # Importar modelos Fitbit
 from models import FitbitUser, FitbitActivity, FitbitSubscription
 
-# ==================== CONFIGURAÇÕES FITBIT ====================
-# ATENÇÃO: Verificar no painel do Fitbit: https://dev.fitbit.com/apps
+# ==================== CONFIGURA��ES FITBIT ====================
+# ATEN��O: Verificar no painel do Fitbit: https://dev.fitbit.com/apps
 
 # PASSO 1: Buscar credenciais do .env primeiro, depois usar fallback
 FITBIT_CLIENT_ID = os.getenv('FITBIT_CLIENT_ID')
 FITBIT_CLIENT_SECRET = os.getenv('FITBIT_CLIENT_SECRET')
 FITBIT_REDIRECT_URI = os.getenv('FITBIT_REDIRECT_URI')
 
-# PASSO 2: Se não houver no .env, usar valores padrão (DESENVOLVIMENTO APENAS)
+# PASSO 2: Se n�o houver no .env, usar valores padr�o (DESENVOLVIMENTO APENAS)
 if not FITBIT_CLIENT_ID:
-    print("⚠️ [FITBIT] FITBIT_CLIENT_ID não encontrado no .env, usando fallback")
+    print("[WARNING] [FITBIT] FITBIT_CLIENT_ID n�o encontrado no .env, usando fallback")
     FITBIT_CLIENT_ID = '23TG6L'
 
 if not FITBIT_CLIENT_SECRET:
-    print("⚠️ [FITBIT] FITBIT_CLIENT_SECRET não encontrado no .env, usando fallback")
+    print("[WARNING] [FITBIT] FITBIT_CLIENT_SECRET n�o encontrado no .env, usando fallback")
     FITBIT_CLIENT_SECRET = '865176f8088f0d18023a42586addbae8'
 
 if not FITBIT_REDIRECT_URI:
-    print("⚠️ [FITBIT] FITBIT_REDIRECT_URI não encontrado no .env, usando fallback")
+    print("[WARNING] [FITBIT] FITBIT_REDIRECT_URI n�o encontrado no .env, usando fallback")
     FITBIT_REDIRECT_URI = 'https://betfit-frontend-thwz.onrender.com/fitbit/callback'
 
-# PASSO 3: Validar se as credenciais estão corretas
-print(f"🔐 [FITBIT] Credenciais carregadas:")
+# PASSO 3: Validar se as credenciais est�o corretas
+print(f"[LOCK] [FITBIT] Credenciais carregadas:")
 print(f"   - Client ID: {FITBIT_CLIENT_ID}")
 print(f"   - Redirect URI: {FITBIT_REDIRECT_URI}")
 print(f"   - Client Secret: ***{FITBIT_CLIENT_SECRET[-4:] if FITBIT_CLIENT_SECRET else 'MISSING'}***")
 
-# PASSO 4: Verificar se Redirect URI está no formato correto
+# PASSO 4: Verificar se Redirect URI est� no formato correto
 if not FITBIT_REDIRECT_URI.startswith('https://'):
-    print("❌ [FITBIT] ERRO: Redirect URI deve começar com https://")
+    print("[ERROR] [FITBIT] ERRO: Redirect URI deve come�ar com https://")
     print(f"   URI atual: {FITBIT_REDIRECT_URI}")
 
 FITBIT_WEBHOOK_VERIFY_CODE = os.getenv('FITBIT_WEBHOOK_VERIFY_CODE', 'betfit_secret_2025')
 @app.route('/api/fitbit/connect', methods=['GET'])
 def fitbit_connect():
-    """Gera URL de autorização Fitbit"""
+    """Gera URL de autoriza��o Fitbit"""
     try:
         user_email = request.args.get('user_email')
         if not user_email:
-            return jsonify({'error': 'user_email é obrigatório'}), 400
+            return jsonify({'error': 'user_email � obrigat�rio'}), 400
         
         # Codificar email no state
         state = base64.b64encode(user_email.encode()).decode()
@@ -6460,14 +6783,14 @@ def fitbit_connect():
             f"state={state}"
         )
         
-        print(f"🔗 [FITBIT] URL de autorização gerada para: {user_email}")
+        print(f"[LINK] [FITBIT] URL de autoriza��o gerada para: {user_email}")
         return jsonify({
             'success': True,
             'authorization_url': auth_url
         })
         
     except Exception as e:
-        print(f"❌ [FITBIT] Erro ao gerar URL: {e}")
+        print(f"[ERROR] [FITBIT] Erro ao gerar URL: {e}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -6475,14 +6798,14 @@ def fitbit_connect():
         state = request.args.get('state')
         user_email = request.args.get('state')
         
-        print(f"🔄 [FITBIT] Processando callback para: {user_email}")
+        print(f"[SYNC] [FITBIT] Processando callback para: {user_email}")
         
-        # Buscar usuário
+        # Buscar usu�rio
         user = session_db.query(User).filter_by(email=user_email).first()
         if not user:
             return redirect(f"{FITBIT_REDIRECT_URI}?fitbit_connected=false&error=usuario_nao_encontrado")
         
-        # Trocar código por tokens
+        # Trocar c�digo por tokens
         token_url = 'https://api.fitbit.com/oauth2/token'
         auth = (FITBIT_CLIENT_ID, FITBIT_CLIENT_SECRET)
         data = {
@@ -6495,12 +6818,12 @@ def fitbit_connect():
         response = requests.post(token_url, auth=auth, data=data)
         
         if response.status_code != 200:
-            print(f"❌ [FITBIT] Erro ao obter tokens: {response.text}")
+            print(f"[ERROR] [FITBIT] Erro ao obter tokens: {response.text}")
             return redirect(f"{FITBIT_REDIRECT_URI}?fitbit_connected=false&error=token_error")
         
         tokens = response.json()
         
-        # ✅ AQUI É ONDE SALVA NO BANCO - VERIFICAR SE ESTÁ CORRETO:
+        # [OK] AQUI � ONDE SALVA NO BANCO - VERIFICAR SE EST� CORRETO:
         fitbit_user = FitbitUser(
             id=str(uuid.uuid4()),
             user_id=user.id,
@@ -6514,7 +6837,7 @@ def fitbit_connect():
         session_db.add(fitbit_user)
         session_db.commit()
         
-        print(f"✅ [FITBIT] Nova conexão criada para: {user_email}")
+        print(f"[OK] [FITBIT] Nova conex�o criada para: {user_email}")
         
         # Criar subscription
         create_fitbit_subscription(fitbit_user, session_db)
@@ -6522,7 +6845,7 @@ def fitbit_connect():
         return redirect(f"{FITBIT_REDIRECT_URI}?fitbit_connected=true")
         
     except Exception as e:
-        print(f"❌ [FITBIT] Erro no callback: {e}")
+        print(f"[ERROR] [FITBIT] Erro no callback: {e}")
         import traceback
         traceback.print_exc()
         return redirect(f"{FITBIT_REDIRECT_URI}?fitbit_connected=false&error=erro_interno")
@@ -6531,20 +6854,20 @@ def fitbit_connect():
 
 @app.route('/api/fitbit/webhook', methods=['GET', 'POST'])
 def fitbit_webhook():
-    """Webhook Fitbit - Recebe notificações em tempo real"""
+    """Webhook Fitbit - Recebe notifica��es em tempo real"""
     
     if request.method == 'GET':
-        # Verificação do endpoint pelo Fitbit
+        # Verifica��o do endpoint pelo Fitbit
         verify = request.args.get('verify')
-        print(f"🔍 [FITBIT] Verificação do webhook: {verify}")
+        print(f"[SEARCH] [FITBIT] Verifica��o do webhook: {verify}")
         
-        # NOVA LÓGICA: Aceitar qualquer código de verificação
-        # O Fitbit gera códigos SHA256 dinâmicos, então aceitamos todos
+        # NOVA L�GICA: Aceitar qualquer c�digo de verifica��o
+        # O Fitbit gera c�digos SHA256 din�micos, ent�o aceitamos todos
         if verify:
-            print("✅ [FITBIT] Webhook verificado com sucesso (código dinâmico aceito)")
+            print("[OK] [FITBIT] Webhook verificado com sucesso (c�digo din�mico aceito)")
             return '', 204
         
-        print("❌ [FITBIT] Código de verificação não fornecido")
+        print("[ERROR] [FITBIT] C�digo de verifica��o n�o fornecido")
         return '', 404
     
     elif request.method == 'POST':
@@ -6561,26 +6884,26 @@ def fitbit_webhook():
             ).hexdigest()
             
             if signature != expected_signature:
-                print("❌ [FITBIT] Assinatura inválida")
+                print("[ERROR] [FITBIT] Assinatura inv�lida")
                 return jsonify({'error': 'Invalid signature'}), 401
             
             notifications = request.json
-            print(f"📬 [FITBIT] {len(notifications)} notificações recebidas")
+            print(f"[MAILBOX] [FITBIT] {len(notifications)} notifica��es recebidas")
             
             for notification in notifications:
                 owner_id = notification['ownerId']
                 collection_type = notification['collectionType']
                 date = notification['date']
                 
-                print(f"🔔 [FITBIT] Notificação: {owner_id} - {collection_type} - {date}")
+                print(f"[BELL] [FITBIT] Notifica��o: {owner_id} - {collection_type} - {date}")
                 
-                # Buscar usuário Fitbit
+                # Buscar usu�rio Fitbit
                 fitbit_user = session_db.query(FitbitUser).filter_by(
                     fitbit_user_id=owner_id
                 ).first()
                 
                 if not fitbit_user:
-                    print(f"⚠️ [FITBIT] Usuário Fitbit não encontrado: {owner_id}")
+                    print(f"[WARNING] [FITBIT] Usu�rio Fitbit n�o encontrado: {owner_id}")
                     continue
                 
                 # Processar atividades
@@ -6593,14 +6916,14 @@ def fitbit_webhook():
             return '', 204
             
         except Exception as e:
-            print(f"❌ [FITBIT] Erro no webhook: {e}")
+            print(f"[ERROR] [FITBIT] Erro no webhook: {e}")
             import traceback
             traceback.print_exc()
             return jsonify({'error': str(e)}), 500
         finally:
             session_db.close()
 
-# Funções auxiliares Fitbit
+# Fun��es auxiliares Fitbit
 def create_fitbit_subscription(fitbit_user, session_db):
     """Cria subscription para receber webhooks"""
     try:
@@ -6609,7 +6932,7 @@ def create_fitbit_subscription(fitbit_user, session_db):
         
         response = requests.post(url, headers=headers)
         
-        if response.status_code in [200, 201, 409]:  # 409 = já existe
+        if response.status_code in [200, 201, 409]:  # 409 = j� existe
             existing = session_db.query(FitbitSubscription).filter_by(
                 fitbit_user_id=fitbit_user.id,
                 collection_type='activities'
@@ -6624,10 +6947,10 @@ def create_fitbit_subscription(fitbit_user, session_db):
                 )
                 session_db.add(subscription)
                 session_db.commit()
-                print(f"✅ [FITBIT] Subscription criada para: {fitbit_user.fitbit_user_id}")
+                print(f"[OK] [FITBIT] Subscription criada para: {fitbit_user.fitbit_user_id}")
             
     except Exception as e:
-        print(f"❌ [FITBIT] Erro ao criar subscription: {e}")
+        print(f"[ERROR] [FITBIT] Erro ao criar subscription: {e}")
 
 def fetch_and_save_fitbit_activities(fitbit_user, date, session_db):
     """Busca atividades do dia no Fitbit"""
@@ -6638,7 +6961,7 @@ def fetch_and_save_fitbit_activities(fitbit_user, date, session_db):
         response = requests.get(url, headers=headers)
         
         if response.status_code != 200:
-            print(f"❌ [FITBIT] Erro ao buscar atividades: {response.status_code}")
+            print(f"[ERROR] [FITBIT] Erro ao buscar atividades: {response.status_code}")
             return
         
         data = response.json()
@@ -6665,37 +6988,132 @@ def fetch_and_save_fitbit_activities(fitbit_user, date, session_db):
                     raw_data=json.dumps(activity)
                 )
                 session_db.add(new_activity)
-                print(f"✅ [FITBIT] Atividade salva: {activity.get('activityName')}")
+                print(f"[OK] [FITBIT] Atividade salva: {activity.get('activityName')}")
         
         session_db.commit()
         
     except Exception as e:
-        print(f"❌ [FITBIT] Erro ao buscar/salvar atividades: {e}")
+        print(f"[ERROR] [FITBIT] Erro ao buscar/salvar atividades: {e}")
 
 def check_fitbit_challenges(session_db, user_id):
     """Verifica se atividades completaram desafios"""
     try:
-        # Reutilizar lógica existente de check_challenge_completion_webhook
         participations = session_db.query(ChallengeParticipation).filter_by(
             user_id=user_id,
             status='active'
         ).all()
-        
-        print(f"🎯 [FITBIT] Verificando {len(participations)} desafios ativos")
-        
-        # Aqui você integra com sua lógica existente
-        
+
+        print(f"[TARGET] [FITBIT] Verificando {len(participations)} desafios ativos")
+
+        for participation in participations:
+            challenge = session_db.query(Challenge).filter_by(id=participation.challenge_id).first()
+            if not challenge:
+                continue
+
+            # Buscar atividades do Fitbit do usuario
+            today = datetime.now().date()
+            activities = session_db.query(FitbitActivity).filter(
+                FitbitActivity.user_id == user_id,
+                func.date(FitbitActivity.start_time) >= challenge.start_date,
+                func.date(FitbitActivity.start_time) <= challenge.end_date
+            ).all()
+
+            # Calcular progresso baseado no tipo de desafio
+            total_progress = 0
+            if challenge.goal_type == 'distance':
+                total_progress = sum(a.distance or 0 for a in activities)
+            elif challenge.goal_type == 'steps':
+                total_progress = sum(a.steps or 0 for a in activities)
+            elif challenge.goal_type == 'duration':
+                total_progress = sum(a.duration or 0 for a in activities)
+            elif challenge.goal_type == 'calories':
+                total_progress = sum(a.calories or 0 for a in activities)
+
+            # Atualizar progresso
+            participation.current_progress = total_progress
+
+            # Verificar se completou a meta
+            if total_progress >= challenge.goal_value:
+                participation.status = 'completed'
+                participation.completed_at = datetime.now()
+                print(f"[TROPHY] [FITBIT] Desafio {challenge.id} completado por {user_id}!")
+
+                # Marcar como vencedor automaticamente
+                mark_challenge_winner(session_db, challenge, participation)
+
+        session_db.commit()
+
     except Exception as e:
-        print(f"❌ [FITBIT] Erro ao verificar desafios: {e}")
+        print(f"[ERROR] [FITBIT] Erro ao verificar desafios: {e}")
+        session_db.rollback()
+
+def mark_challenge_winner(session_db, challenge, participation):
+    """Marca participante como vencedor e distribui premio"""
+    try:
+        # Verificar se ja e vencedor
+        existing_winner = session_db.query(ChallengeWinner).filter_by(
+            challenge_id=challenge.id,
+            user_id=participation.user_id
+        ).first()
+
+        if existing_winner:
+            return
+
+        # Calcular premio
+        total_pool = challenge.prize_pool or challenge.entry_fee * challenge.participant_count
+        platform_fee_rate = float(os.getenv('PLATFORM_FEE_RATE', '0.05'))
+        platform_fee = total_pool * platform_fee_rate
+        net_pool = total_pool - platform_fee
+
+        # Criar registro de vencedor
+        winner = ChallengeWinner(
+            id=str(uuid.uuid4()),
+            challenge_id=challenge.id,
+            user_id=participation.user_id,
+            ranking_position=1,
+            prize_amount=net_pool,
+            completed_at=participation.completed_at,
+            paid_out=False
+        )
+        session_db.add(winner)
+
+        # Creditar premio na carteira
+        user = session_db.query(User).filter_by(id=participation.user_id).first()
+        wallet = session_db.query(Wallet).filter_by(user_id=user.id).first()
+
+        if wallet:
+            wallet.balance += net_pool
+
+            # Criar transacao
+            transaction = Transaction(
+                id=str(uuid.uuid4()),
+                user_id=user.id,
+                wallet_id=wallet.id,
+                type='prize',
+                amount=net_pool,
+                description=f'Premio do desafio: {challenge.title}',
+                status='completed'
+            )
+            session_db.add(transaction)
+
+        # Atualizar status do desafio
+        challenge.status = 'completed'
+
+        session_db.commit()
+        print(f"[TROPHY] [WINNER] Usuario {user.name} ganhou R$ {net_pool:.2f}!")
+
+    except Exception as e:
+        print(f"[ERROR] [WINNER] Erro ao marcar vencedor: {e}")
+        session_db.rollback()
 
 @app.route('/api/fitbit/status', methods=['GET'])
 def fitbit_status():
-    """Verifica status da conexão Fitbit"""
+    """Verifica status da conex�o Fitbit"""
     session_db = SessionLocal()
     try:
         user_email = request.args.get('user_email')
         if not user_email:
-            return jsonify({'error': 'user_email obrigatório'}), 400
+            return jsonify({'error': 'user_email obrigat�rio'}), 400
         
         user = session_db.query(User).filter_by(email=user_email).first()
         if not user:
@@ -6719,18 +7137,18 @@ def fitbit_status():
 
 
 
-    # ==================== ROTAS DE TERMOS E POLÍTICAS ====================
+    # ==================== ROTAS DE TERMOS E POL�TICAS ====================
 
 @app.route('/terms', methods=['GET'])
 def terms_of_service():
-    """Página de Termos de Serviço"""
+    """P�gina de Termos de Servi�o"""
     return """
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Termos de Serviço - BetFit</title>
+    <title>Termos de Servi�o - BetFit</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -6806,105 +7224,105 @@ def terms_of_service():
 <body>
     <div class="container">
         <div class="header">
-            <h1>Termos de Serviço</h1>
-            <p>Última atualização: """ + datetime.now().strftime('%d/%m/%Y') + """</p>
+            <h1>Termos de Servi�o</h1>
+            <p>�ltima atualiza��o: """ + datetime.now().strftime('%d/%m/%Y') + """</p>
         </div>
 
-        <h2>1. Aceitação dos Termos</h2>
+        <h2>1. Aceita��o dos Termos</h2>
         <p>
-            Ao acessar e utilizar a plataforma BetFit, você concorda em cumprir e estar vinculado 
-            aos seguintes Termos de Serviço. Se você não concordar com qualquer parte destes termos, 
-            não deve utilizar nossos serviços.
+            Ao acessar e utilizar a plataforma BetFit, voc� concorda em cumprir e estar vinculado 
+            aos seguintes Termos de Servi�o. Se voc� n�o concordar com qualquer parte destes termos, 
+            n�o deve utilizar nossos servi�os.
         </p>
 
-        <h2>2. Descrição do Serviço</h2>
+        <h2>2. Descri��o do Servi�o</h2>
         <p>
-            O BetFit é uma plataforma de desafios fitness onde usuários podem participar de competições 
-            baseadas em atividades físicas monitoradas através de dispositivos e aplicativos de fitness 
+            O BetFit � uma plataforma de desafios fitness onde usu�rios podem participar de competi��es 
+            baseadas em atividades f�sicas monitoradas atrav�s de dispositivos e aplicativos de fitness 
             conectados, incluindo Fitbit, Strava, Apple Health, Google Fit e outros.
         </p>
 
         <h2>3. Elegibilidade</h2>
-        <p>Para utilizar o BetFit, você deve:</p>
+        <p>Para utilizar o BetFit, voc� deve:</p>
         <ul>
             <li>Ter pelo menos 18 anos de idade</li>
-            <li>Fornecer informações verdadeiras e precisas durante o registro</li>
+            <li>Fornecer informa��es verdadeiras e precisas durante o registro</li>
             <li>Manter a confidencialidade de sua conta e senha</li>
-            <li>Ser responsável por todas as atividades realizadas em sua conta</li>
+            <li>Ser respons�vel por todas as atividades realizadas em sua conta</li>
         </ul>
 
         <h2>4. Coleta de Dados Fitness</h2>
         <p>
-            Ao conectar dispositivos de fitness (como Fitbit) ao BetFit, você autoriza a coleta, 
+            Ao conectar dispositivos de fitness (como Fitbit) ao BetFit, voc� autoriza a coleta, 
             armazenamento e processamento dos seguintes dados:
         </p>
         <ul>
-            <li>Dados de atividades físicas (passos, distância, calorias)</li>
-            <li>Frequência cardíaca e métricas de saúde</li>
-            <li>Dados de sono e recuperação</li>
-            <li>Localização GPS das atividades (quando aplicável)</li>
+            <li>Dados de atividades f�sicas (passos, dist�ncia, calorias)</li>
+            <li>Frequ�ncia card�aca e m�tricas de sa�de</li>
+            <li>Dados de sono e recupera��o</li>
+            <li>Localiza��o GPS das atividades (quando aplic�vel)</li>
         </ul>
 
         <h2>5. Uso dos Dados</h2>
-        <p>Os dados coletados são utilizados exclusivamente para:</p>
+        <p>Os dados coletados s�o utilizados exclusivamente para:</p>
         <ul>
-            <li>Validação automática de desafios completados</li>
-            <li>Cálculo de resultados e distribuição de prêmios</li>
-            <li>Estatísticas e análises de desempenho</li>
-            <li>Melhoria da experiência do usuário</li>
+            <li>Valida��o autom�tica de desafios completados</li>
+            <li>C�lculo de resultados e distribui��o de pr�mios</li>
+            <li>Estat�sticas e an�lises de desempenho</li>
+            <li>Melhoria da experi�ncia do usu�rio</li>
         </ul>
 
         <h2>6. Desafios e Apostas</h2>
         <p>
-            Ao participar de um desafio no BetFit, você concorda que:
+            Ao participar de um desafio no BetFit, voc� concorda que:
         </p>
         <ul>
-            <li>Os valores apostados não são reembolsáveis após a confirmação</li>
-            <li>Os resultados são baseados em dados verificados dos aplicativos conectados</li>
-            <li>A plataforma cobra uma taxa administrativa sobre o pool de prêmios</li>
-            <li>Tentativas de fraude resultarão em banimento permanente</li>
+            <li>Os valores apostados n�o s�o reembols�veis ap�s a confirma��o</li>
+            <li>Os resultados s�o baseados em dados verificados dos aplicativos conectados</li>
+            <li>A plataforma cobra uma taxa administrativa sobre o pool de pr�mios</li>
+            <li>Tentativas de fraude resultar�o em banimento permanente</li>
         </ul>
 
-        <h2>7. Segurança e Privacidade</h2>
+        <h2>7. Seguran�a e Privacidade</h2>
         <p>
-            Implementamos medidas de segurança para proteger seus dados, incluindo:
+            Implementamos medidas de seguran�a para proteger seus dados, incluindo:
         </p>
         <ul>
             <li>Criptografia de tokens de acesso</li>
             <li>Armazenamento seguro em servidores protegidos</li>
             <li>Acesso restrito aos dados pessoais</li>
-            <li>Conformidade com LGPD (Lei Geral de Proteção de Dados)</li>
+            <li>Conformidade com LGPD (Lei Geral de Prote��o de Dados)</li>
         </ul>
 
-        <h2>8. Direitos do Usuário</h2>
-        <p>Você tem o direito de:</p>
+        <h2>8. Direitos do Usu�rio</h2>
+        <p>Voc� tem o direito de:</p>
         <ul>
             <li>Acessar todos os seus dados armazenados</li>
-            <li>Solicitar correção de dados incorretos</li>
+            <li>Solicitar corre��o de dados incorretos</li>
             <li>Desconectar dispositivos de fitness a qualquer momento</li>
             <li>Excluir sua conta e todos os dados associados</li>
         </ul>
 
-        <h2>9. Limitação de Responsabilidade</h2>
+        <h2>9. Limita��o de Responsabilidade</h2>
         <p>
-            O BetFit não se responsabiliza por:
+            O BetFit n�o se responsabiliza por:
         </p>
         <ul>
             <li>Falhas nos aplicativos de fitness de terceiros (Fitbit, Strava, etc.)</li>
             <li>Dados incorretos fornecidos pelos dispositivos conectados</li>
-            <li>Lesões ou problemas de saúde decorrentes da participação em desafios</li>
+            <li>Les�es ou problemas de sa�de decorrentes da participa��o em desafios</li>
             <li>Perdas financeiras devido a apostas em desafios</li>
         </ul>
 
-        <h2>10. Modificações dos Termos</h2>
+        <h2>10. Modifica��es dos Termos</h2>
         <p>
-            Reservamo-nos o direito de modificar estes Termos de Serviço a qualquer momento. 
-            Alterações significativas serão notificadas por email ou através da plataforma.
+            Reservamo-nos o direito de modificar estes Termos de Servi�o a qualquer momento. 
+            Altera��es significativas ser�o notificadas por email ou atrav�s da plataforma.
         </p>
 
         <h2>11. Contato</h2>
         <p>
-            Para dúvidas sobre estes Termos de Serviço, entre em contato:
+            Para d�vidas sobre estes Termos de Servi�o, entre em contato:
         </p>
         <ul>
             <li>Email: support@betfit.com</li>
@@ -6922,14 +7340,14 @@ def terms_of_service():
 
 @app.route('/privacy', methods=['GET'])
 def privacy_policy():
-    """Página de Política de Privacidade"""
+    """P�gina de Pol�tica de Privacidade"""
     return """
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Política de Privacidade - BetFit</title>
+    <title>Pol�tica de Privacidade - BetFit</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -7005,21 +7423,21 @@ def privacy_policy():
 <body>
     <div class="container">
         <div class="header">
-            <h1>Política de Privacidade</h1>
-            <p>Última atualização: """ + datetime.now().strftime('%d/%m/%Y') + """</p>
+            <h1>Pol�tica de Privacidade</h1>
+            <p>�ltima atualiza��o: """ + datetime.now().strftime('%d/%m/%Y') + """</p>
         </div>
 
-        <h2>1. Introdução</h2>
+        <h2>1. Introdu��o</h2>
         <p>
-            A BetFit ("nós", "nosso" ou "plataforma") está comprometida em proteger a privacidade 
-            dos nossos usuários. Esta Política de Privacidade explica como coletamos, usamos, 
-            armazenamos e protegemos suas informações pessoais.
+            A BetFit ("n�s", "nosso" ou "plataforma") est� comprometida em proteger a privacidade 
+            dos nossos usu�rios. Esta Pol�tica de Privacidade explica como coletamos, usamos, 
+            armazenamos e protegemos suas informa��es pessoais.
         </p>
 
-        <h2>2. Informações que Coletamos</h2>
-        <p>Coletamos os seguintes tipos de informações:</p>
+        <h2>2. Informa��es que Coletamos</h2>
+        <p>Coletamos os seguintes tipos de informa��es:</p>
         
-        <h3 style="color: #666; font-size: 1.2rem; margin-top: 20px;">2.1 Informações de Cadastro</h3>
+        <h3 style="color: #666; font-size: 1.2rem; margin-top: 20px;">2.1 Informa��es de Cadastro</h3>
         <ul>
             <li>Nome completo</li>
             <li>Email</li>
@@ -7029,96 +7447,96 @@ def privacy_policy():
 
         <h3 style="color: #666; font-size: 1.2rem; margin-top: 20px;">2.2 Dados de Fitness (via Fitbit, Strava, etc.)</h3>
         <ul>
-            <li>Atividades físicas (corrida, caminhada, ciclismo)</li>
-            <li>Distância percorrida</li>
+            <li>Atividades f�sicas (corrida, caminhada, ciclismo)</li>
+            <li>Dist�ncia percorrida</li>
             <li>Calorias queimadas</li>
-            <li>Passos diários</li>
-            <li>Frequência cardíaca</li>
+            <li>Passos di�rios</li>
+            <li>Frequ�ncia card�aca</li>
             <li>Dados de sono</li>
-            <li>Localização GPS das atividades</li>
+            <li>Localiza��o GPS das atividades</li>
         </ul>
 
         <h3 style="color: #666; font-size: 1.2rem; margin-top: 20px;">2.3 Dados Financeiros</h3>
         <ul>
-            <li>Histórico de transações</li>
+            <li>Hist�rico de transa��es</li>
             <li>Valores apostados e ganhos</li>
             <li>Dados de pagamento (processados por terceiros seguros)</li>
         </ul>
 
-        <h2>3. Como Usamos Suas Informações</h2>
-        <p>Utilizamos suas informações para:</p>
+        <h2>3. Como Usamos Suas Informa��es</h2>
+        <p>Utilizamos suas informa��es para:</p>
         <ul>
             <li>Criar e gerenciar sua conta</li>
-            <li>Processar participações em desafios</li>
+            <li>Processar participa��es em desafios</li>
             <li>Validar automaticamente resultados de desafios</li>
-            <li>Processar pagamentos e prêmios</li>
-            <li>Enviar notificações sobre desafios e resultados</li>
-            <li>Melhorar nossos serviços e experiência do usuário</li>
-            <li>Prevenir fraudes e garantir segurança</li>
+            <li>Processar pagamentos e pr�mios</li>
+            <li>Enviar notifica��es sobre desafios e resultados</li>
+            <li>Melhorar nossos servi�os e experi�ncia do usu�rio</li>
+            <li>Prevenir fraudes e garantir seguran�a</li>
         </ul>
 
         <h2>4. Compartilhamento de Dados</h2>
-        <p>Seus dados NÃO são vendidos a terceiros. Compartilhamos informações apenas com:</p>
+        <p>Seus dados N�O s�o vendidos a terceiros. Compartilhamos informa��es apenas com:</p>
         <ul>
-            <li><strong>Provedores de Fitness:</strong> Fitbit, Strava, Apple, Google (para sincronização de dados)</li>
-            <li><strong>Processadores de Pagamento:</strong> MercadoPago (para transações financeiras)</li>
-            <li><strong>Serviços de Hospedagem:</strong> Render.com (armazenamento seguro de dados)</li>
+            <li><strong>Provedores de Fitness:</strong> Fitbit, Strava, Apple, Google (para sincroniza��o de dados)</li>
+            <li><strong>Processadores de Pagamento:</strong> MercadoPago (para transa��es financeiras)</li>
+            <li><strong>Servi�os de Hospedagem:</strong> Render.com (armazenamento seguro de dados)</li>
             <li><strong>Autoridades Legais:</strong> Quando exigido por lei</li>
         </ul>
 
-        <h2>5. Segurança dos Dados</h2>
-        <p>Implementamos medidas de segurança robustas:</p>
+        <h2>5. Seguran�a dos Dados</h2>
+        <p>Implementamos medidas de seguran�a robustas:</p>
         <ul>
-            <li>Criptografia SSL/TLS para todas as comunicações</li>
+            <li>Criptografia SSL/TLS para todas as comunica��es</li>
             <li>Senhas armazenadas com hash seguro (SHA256)</li>
             <li>Tokens de acesso criptografados</li>
             <li>Acesso restrito aos servidores</li>
-            <li>Monitoramento contínuo de segurança</li>
+            <li>Monitoramento cont�nuo de seguran�a</li>
             <li>Backups regulares e seguros</li>
         </ul>
 
         <h2>6. Seus Direitos (LGPD)</h2>
-        <p>De acordo com a Lei Geral de Proteção de Dados (LGPD), você tem direito a:</p>
+        <p>De acordo com a Lei Geral de Prote��o de Dados (LGPD), voc� tem direito a:</p>
         <ul>
-            <li><strong>Acesso:</strong> Solicitar cópia de todos os seus dados</li>
-            <li><strong>Correção:</strong> Atualizar dados incorretos ou desatualizados</li>
-            <li><strong>Exclusão:</strong> Solicitar a remoção de seus dados</li>
-            <li><strong>Portabilidade:</strong> Exportar seus dados em formato legível</li>
-            <li><strong>Oposição:</strong> Opor-se ao processamento de seus dados</li>
-            <li><strong>Revogação:</strong> Revogar consentimentos dados anteriormente</li>
+            <li><strong>Acesso:</strong> Solicitar c�pia de todos os seus dados</li>
+            <li><strong>Corre��o:</strong> Atualizar dados incorretos ou desatualizados</li>
+            <li><strong>Exclus�o:</strong> Solicitar a remo��o de seus dados</li>
+            <li><strong>Portabilidade:</strong> Exportar seus dados em formato leg�vel</li>
+            <li><strong>Oposi��o:</strong> Opor-se ao processamento de seus dados</li>
+            <li><strong>Revoga��o:</strong> Revogar consentimentos dados anteriormente</li>
         </ul>
 
-        <h2>7. Retenção de Dados</h2>
+        <h2>7. Reten��o de Dados</h2>
         <p>
-            Mantemos seus dados enquanto sua conta estiver ativa. Após exclusão da conta, 
-            dados financeiros são mantidos por 5 anos (exigência legal), e demais dados 
-            são deletados em até 30 dias.
+            Mantemos seus dados enquanto sua conta estiver ativa. Ap�s exclus�o da conta, 
+            dados financeiros s�o mantidos por 5 anos (exig�ncia legal), e demais dados 
+            s�o deletados em at� 30 dias.
         </p>
 
         <h2>8. Cookies e Tecnologias Similares</h2>
         <p>Utilizamos cookies para:</p>
         <ul>
-            <li>Manter você logado na plataforma</li>
-            <li>Lembrar suas preferências</li>
+            <li>Manter voc� logado na plataforma</li>
+            <li>Lembrar suas prefer�ncias</li>
             <li>Analisar uso da plataforma (Google Analytics)</li>
-            <li>Melhorar a experiência do usuário</li>
+            <li>Melhorar a experi�ncia do usu�rio</li>
         </ul>
 
         <h2>9. Dados de Menores</h2>
         <p>
-            Nossa plataforma não é direcionada a menores de 18 anos. Não coletamos 
+            Nossa plataforma n�o � direcionada a menores de 18 anos. N�o coletamos 
             intencionalmente dados de menores. Se descobrirmos que coletamos dados 
             de um menor, deletaremos imediatamente.
         </p>
 
-        <h2>10. Alterações nesta Política</h2>
+        <h2>10. Altera��es nesta Pol�tica</h2>
         <p>
-            Podemos atualizar esta Política de Privacidade periodicamente. Notificaremos 
-            sobre mudanças significativas por email ou através de aviso na plataforma.
+            Podemos atualizar esta Pol�tica de Privacidade periodicamente. Notificaremos 
+            sobre mudan�as significativas por email ou atrav�s de aviso na plataforma.
         </p>
 
         <h2>11. Contato</h2>
-        <p>Para exercer seus direitos ou esclarecer dúvidas:</p>
+        <p>Para exercer seus direitos ou esclarecer d�vidas:</p>
         <ul>
             <li><strong>Email DPO:</strong> privacy@betfit.com</li>
             <li><strong>Email Suporte:</strong> support@betfit.com</li>
@@ -7135,6 +7553,437 @@ def privacy_policy():
     """
 
 
+# ==================== ENDPOINTS DE PERFIL ====================
+
+@app.route('/api/user/profile', methods=['PUT'])
+def update_user_profile():
+    """Atualizar perfil do usuário"""
+    session = SessionLocal()
+    try:
+        data = request.get_json()
+        user_email = data.get('user_email')
+
+        if not user_email:
+            return jsonify({'error': 'user_email é obrigatório'}), 400
+
+        # Buscar usuário
+        user = session.query(User).filter_by(email=user_email).first()
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+
+        # Atualizar campos permitidos
+        if 'name' in data:
+            user.name = data['name']
+        if 'phone' in data:
+            user.phone = data['phone']
+        if 'bio' in data:
+            user.bio = data['bio']
+        if 'location' in data:
+            user.location = data['location']
+        if 'birthdate' in data and data['birthdate']:
+            user.birthdate = datetime.fromisoformat(data['birthdate'])
+        if 'theme_preference' in data:
+            user.theme_preference = data['theme_preference']
+        if 'pix_key' in data:
+            user.pix_key = data['pix_key']
+
+        user.updated_at = datetime.utcnow()
+        session.commit()
+
+        print(f"[OK] [PROFILE] Perfil atualizado para {user_email}")
+
+        return jsonify({
+            'success': True,
+            'message': 'Perfil atualizado com sucesso',
+            'user': user.to_dict()
+        }), 200
+
+    except Exception as e:
+        session.rollback()
+        print(f"[ERROR] [PROFILE] Erro ao atualizar perfil: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/user/upload-avatar', methods=['POST'])
+def upload_avatar():
+    """Upload de foto de perfil"""
+    session = SessionLocal()
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'Nenhum arquivo enviado'}), 400
+
+        file = request.files['file']
+        user_email = request.form.get('user_email')
+
+        if not user_email:
+            return jsonify({'error': 'user_email é obrigatório'}), 400
+
+        if file.filename == '':
+            return jsonify({'error': 'Arquivo vazio'}), 400
+
+        # Validar extensão
+        allowed_extensions = {'jpg', 'jpeg', 'png', 'gif'}
+        ext = file.filename.rsplit('.', 1)[1].lower() if '.' in file.filename else ''
+        if ext not in allowed_extensions:
+            return jsonify({'error': 'Formato não permitido. Use: jpg, jpeg, png, gif'}), 400
+
+        # Validar tamanho (max 5MB)
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        file.seek(0)
+        if file_size > 5242880:  # 5MB
+            return jsonify({'error': 'Arquivo muito grande. Máximo: 5MB'}), 400
+
+        # Buscar usuário
+        user = session.query(User).filter_by(email=user_email).first()
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+
+        # Gerar nome único
+        filename = f"{user.id}_{secrets.token_hex(8)}.{ext}"
+        upload_folder = os.getenv('UPLOAD_FOLDER', './src/uploads')
+        filepath = os.path.join(upload_folder, 'avatars', filename)
+
+        # Criar diretório se não existir
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+        # Salvar arquivo
+        file.save(filepath)
+
+        # Atualizar URL no banco
+        avatar_url = f"/uploads/avatars/{filename}"
+        user.profile_picture = avatar_url
+        user.updated_at = datetime.utcnow()
+        session.commit()
+
+        print(f"[OK] [AVATAR] Foto salva para {user_email}: {avatar_url}")
+
+        return jsonify({
+            'success': True,
+            'message': 'Avatar atualizado com sucesso',
+            'avatar_url': avatar_url
+        }), 200
+
+    except Exception as e:
+        session.rollback()
+        print(f"[ERROR] [AVATAR] Erro ao fazer upload: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+# ==================== ENDPOINTS DE DEPÓSITO ====================
+
+@app.route('/api/wallet/deposit/pix', methods=['POST'])
+def deposit_pix():
+    """Criar depósito via PIX"""
+    session = SessionLocal()
+    try:
+        data = request.get_json()
+        user_email = data.get('user_email')
+        amount = float(data.get('amount', 0))
+
+        if not user_email or amount <= 0:
+            return jsonify({'error': 'user_email e amount são obrigatórios'}), 400
+
+        if amount < 10:
+            return jsonify({'error': 'Valor mínimo para depósito: R$10'}), 400
+
+        # Buscar usuário
+        user = session.query(User).filter_by(email=user_email).first()
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+
+        # Buscar carteira
+        wallet = session.query(Wallet).filter_by(user_id=user.id).first()
+        if not wallet:
+            # Criar carteira se não existir
+            wallet = Wallet(user_id=user.id, balance=0.0)
+            session.add(wallet)
+            session.commit()
+
+        # Criar pagamento no MercadoPago
+        import mercadopago
+        sdk_mp = mercadopago.SDK(ACCESS_TOKEN)
+
+        payment_data = {
+            "transaction_amount": amount,
+            "description": f"Depósito BetFit - {user.name}",
+            "payment_method_id": "pix",
+            "payer": {
+                "email": user_email,
+                "first_name": user.name.split()[0] if user.name else "Usuário",
+                "last_name": user.name.split()[-1] if user.name and len(user.name.split()) > 1 else "BetFit"
+            }
+        }
+
+        payment_response = sdk_mp.payment().create(payment_data)
+        payment = payment_response["response"]
+
+        if payment_response["status"] != 201:
+            return jsonify({'error': 'Erro ao criar pagamento no MercadoPago'}), 500
+
+        # Criar transação no banco
+        transaction = Transaction(
+            user_id=user.id,
+            wallet_id=wallet.id,
+            type='deposit',
+            amount=amount,
+            status='pending',
+            description=f'Depósito PIX - Aguardando pagamento',
+            payment_method='pix',
+            payment_id=str(payment['id'])
+        )
+        session.add(transaction)
+        session.commit()
+
+        # Extrair QR Code
+        qr_code = payment['point_of_interaction']['transaction_data']['qr_code']
+        qr_code_base64 = payment['point_of_interaction']['transaction_data']['qr_code_base64']
+
+        print(f"[OK] [DEPOSIT] PIX gerado para {user_email}: R${amount} - ID: {payment['id']}")
+
+        return jsonify({
+            'success': True,
+            'message': 'QR Code gerado com sucesso',
+            'payment_id': payment['id'],
+            'transaction_id': transaction.id,
+            'amount': amount,
+            'qr_code': qr_code,
+            'qr_code_base64': qr_code_base64,
+            'expires_at': payment['date_of_expiration']
+        }), 200
+
+    except Exception as e:
+        session.rollback()
+        print(f"[ERROR] [DEPOSIT] Erro ao criar depósito PIX: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/wallet/deposit/credit-card', methods=['POST'])
+def deposit_credit_card():
+    """Depósito via cartão de crédito"""
+    session = SessionLocal()
+    try:
+        data = request.get_json()
+        user_email = data.get('user_email')
+        amount = float(data.get('amount', 0))
+        card_data = data.get('card_data', {})
+
+        if not user_email or amount <= 0:
+            return jsonify({'error': 'user_email e amount são obrigatórios'}), 400
+
+        if amount < 10:
+            return jsonify({'error': 'Valor mínimo para depósito: R$10'}), 400
+
+        # Buscar usuário e carteira
+        user = session.query(User).filter_by(email=user_email).first()
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+
+        wallet = session.query(Wallet).filter_by(user_id=user.id).first()
+        if not wallet:
+            wallet = Wallet(user_id=user.id, balance=0.0)
+            session.add(wallet)
+            session.commit()
+
+        # Processar pagamento via MercadoPago
+        import mercadopago
+        sdk_mp = mercadopago.SDK(ACCESS_TOKEN)
+
+        payment_data = {
+            "transaction_amount": amount,
+            "token": card_data.get('token'),  # Token gerado pelo Checkout Pro
+            "description": f"Depósito BetFit - {user.name}",
+            "installments": 1,
+            "payment_method_id": card_data.get('payment_method_id', 'visa'),
+            "payer": {
+                "email": user_email
+            }
+        }
+
+        payment_response = sdk_mp.payment().create(payment_data)
+        payment = payment_response["response"]
+
+        # Criar transação
+        transaction = Transaction(
+            user_id=user.id,
+            wallet_id=wallet.id,
+            type='deposit',
+            amount=amount,
+            status='pending',
+            description=f'Depósito Cartão de Crédito',
+            payment_method='credit_card',
+            payment_id=str(payment['id'])
+        )
+        session.add(transaction)
+
+        # Se aprovado imediatamente, creditar
+        if payment['status'] == 'approved':
+            wallet.balance += amount
+            user.total_deposited += amount
+            transaction.status = 'completed'
+            print(f"[OK] [DEPOSIT] Cartão aprovado: R${amount} creditado para {user_email}")
+
+        session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Pagamento processado',
+            'payment_id': payment['id'],
+            'status': payment['status'],
+            'status_detail': payment.get('status_detail', ''),
+            'amount': amount
+        }), 200
+
+    except Exception as e:
+        session.rollback()
+        print(f"[ERROR] [DEPOSIT] Erro ao processar cartão: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+# ==================== ENDPOINTS DE SAQUE ====================
+
+@app.route('/api/wallet/withdraw/pix', methods=['POST'])
+def withdraw_pix():
+    """Saque via PIX"""
+    session = SessionLocal()
+    try:
+        data = request.get_json()
+        user_email = data.get('user_email')
+        amount = float(data.get('amount', 0))
+        pix_key = data.get('pix_key')
+
+        if not all([user_email, amount, pix_key]):
+            return jsonify({'error': 'user_email, amount e pix_key são obrigatórios'}), 400
+
+        if amount < float(os.getenv('WITHDRAWAL_MIN_AMOUNT', 20)):
+            return jsonify({'error': f'Valor mínimo para saque: R${os.getenv("WITHDRAWAL_MIN_AMOUNT", 20)}'}), 400
+
+        # Buscar usuário e carteira
+        user = session.query(User).filter_by(email=user_email).first()
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+
+        wallet = session.query(Wallet).filter_by(user_id=user.id).first()
+        if not wallet:
+            return jsonify({'error': 'Carteira não encontrada'}), 404
+
+        # Calcular taxa
+        fee_percent = float(os.getenv('WITHDRAWAL_FEE_PERCENT', 2)) / 100
+        fee_amount = max(amount * fee_percent, 5.0)  # Mínimo R$5
+        total_amount = amount + fee_amount
+
+        # Validar saldo
+        if wallet.balance < total_amount:
+            return jsonify({
+                'error': 'Saldo insuficiente',
+                'balance': wallet.balance,
+                'required': total_amount,
+                'fee': fee_amount
+            }), 400
+
+        # Descontar do saldo
+        wallet.balance -= total_amount
+        user.total_withdrawn += amount
+
+        # Criar transação
+        transaction = Transaction(
+            user_id=user.id,
+            wallet_id=wallet.id,
+            type='withdrawal',
+            amount=amount,
+            fee=fee_amount,
+            status='processing',
+            description=f'Saque PIX - Chave: {pix_key[:10]}...',
+            payment_method='pix',
+            pix_key=pix_key
+        )
+        session.add(transaction)
+        session.commit()
+
+        # Auto-aprovar se menor que limite
+        auto_approve_limit = float(os.getenv('WITHDRAWAL_AUTO_APPROVE_LIMIT', 1000))
+        if amount < auto_approve_limit:
+            transaction.status = 'completed'
+            session.commit()
+            print(f"[OK] [WITHDRAW] Auto-aprovado: R${amount} para {pix_key}")
+        else:
+            print(f"[INFO] [WITHDRAW] Aguardando aprovação manual: R${amount}")
+
+        return jsonify({
+            'success': True,
+            'message': 'Saque solicitado com sucesso',
+            'transaction_id': transaction.id,
+            'amount': amount,
+            'fee': fee_amount,
+            'total': total_amount,
+            'status': transaction.status,
+            'estimated_time': '1-2 dias úteis' if amount >= auto_approve_limit else 'Imediato'
+        }), 200
+
+    except Exception as e:
+        session.rollback()
+        print(f"[ERROR] [WITHDRAW] Erro ao processar saque: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+@app.route('/api/wallet/withdraw/history', methods=['GET'])
+def withdraw_history():
+    """Histórico de saques"""
+    session = SessionLocal()
+    try:
+        user_email = request.args.get('user_email')
+
+        if not user_email:
+            return jsonify({'error': 'user_email é obrigatório'}), 400
+
+        user = session.query(User).filter_by(email=user_email).first()
+        if not user:
+            return jsonify({'error': 'Usuário não encontrado'}), 404
+
+        # Buscar transações de saque
+        withdrawals = session.query(Transaction).filter_by(
+            user_id=user.id,
+            type='withdrawal'
+        ).order_by(Transaction.created_at.desc()).limit(50).all()
+
+        withdrawals_data = []
+        for w in withdrawals:
+            withdrawals_data.append({
+                'id': w.id,
+                'amount': w.amount,
+                'fee': w.fee,
+                'status': w.status,
+                'pix_key': w.pix_key,
+                'created_at': w.created_at.isoformat() if w.created_at else None,
+                'description': w.description
+            })
+
+        return jsonify({
+            'success': True,
+            'withdrawals': withdrawals_data,
+            'total': len(withdrawals_data)
+        }), 200
+
+    except Exception as e:
+        print(f"[ERROR] [WITHDRAW] Erro ao buscar histórico: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session.close()
+
+
+print("[OK] Novos endpoints carregados: Perfil, Depósito e Saque")
+
+
 # ==================== MAIN ====================
 
 if __name__ == '__main__':
@@ -7144,60 +7993,60 @@ if __name__ == '__main__':
     debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     
     if is_production:
-        print("🚀 Iniciando BetFit Backend - PRODUÇÃO RENDER")
-        print(f"🌐 Porta: {port}")
-        print(f"💾 Database: PostgreSQL (Render)")
-        print("📊 Banco de dados: SQLite com SQLAlchemy")
+        print("[ROCKET] Iniciando BetFit Backend - PRODU��O RENDER")
+        print(f"[WEB] Porta: {port}")
+        print(f"[DB] Database: PostgreSQL (Render)")
+        print("[CHART] Banco de dados: SQLite com SQLAlchemy")
         
-        # Configurações de produção
+        # Configura��es de produ��o
         app.config['SESSION_COOKIE_SECURE'] = True
         app.config['SESSION_COOKIE_HTTPONLY'] = True
         app.config['SESSION_COOKIE_SAMESITE'] = 'None'
         
-        print("✅ Configurações de produção aplicadas")
+        print("[OK] Configura��es de produ��o aplicadas")
         print("   - Cookies seguros habilitados")
         print("   - Debug desabilitado")
         print("   - Ready para deploy!")
         
     else:
-        print("🚀 Iniciando BetFit Backend - DESENVOLVIMENTO")
-        print(f"🌐 Backend URL: {os.getenv('BACKEND_URL', 'http://localhost:5001')}")
-        print(f"🌐 Frontend URL: {os.getenv('FRONTEND_URL', 'http://localhost:3000')}")
-        print(f"🔧 CORS Origins: {cors_origins}")
-        print(f"💾 Database: {DATABASE_PATH}")
+        print("[ROCKET] Iniciando BetFit Backend - DESENVOLVIMENTO")
+        print(f"[WEB] Backend URL: {os.getenv('BACKEND_URL', 'http://localhost:5001')}")
+        print(f"[WEB] Frontend URL: {os.getenv('FRONTEND_URL', 'http://localhost:3000')}")
+        print(f"[WRENCH] CORS Origins: {cors_origins}")
+        print(f"[DB] Database: {DATABASE_PATH}")
         
         # Suas rotas de desenvolvimento (mantidas para desenvolvimento local)
-        print("💰 Rotas de carteira disponíveis:")
+        print("[MONEY] Rotas de carteira dispon�veis:")
         print("   - GET /api/wallet/<email>")
         print("   - GET /api/wallet?email=<email>")
         print("   - GET /api/wallet/balance?email=<email>")
         
-        print("🎮 Rotas de desafios disponíveis:")
+        print("[RACE_CAR] Rotas de desafios dispon�veis:")
         print("   - GET /api/challenges")
         print("   - POST /api/challenges/<id>/join")
         print("   - POST /api/challenges/<id>/complete")
         
-        print("🔐 Rotas de autenticação:")
+        print("[LOCK] Rotas de autentica��o:")
         print("   - POST /api/auth/register")
         print("   - POST /api/auth/login")
         
-        print("💳 Rotas de pagamento:")
+        print("[CREDIT_CARD] Rotas de pagamento:")
         print("   - POST /api/payments/pix")
         print("   - POST /api/payments/card")
         
-        # Configurações específicas para túneis (desenvolvimento)
+        # Configura��es espec�ficas para t�neis (desenvolvimento)
         if os.getenv('TUNNEL_PROVIDER') == 'localtunnel':
-            print("🌐 Modo LocalTunnel ativado")
+            print("[WEB] Modo LocalTunnel ativado")
             app.config['SESSION_COOKIE_SECURE'] = True
             app.config['SESSION_COOKIE_HTTPONLY'] = True
             app.config['SESSION_COOKIE_SAMESITE'] = 'None'
             debug_mode = False
             print("   - Cookies configurados para HTTPS")
     
-    print(f"🚀 Servidor iniciando na porta {port}")
+    print(f"[ROCKET] Servidor iniciando na porta {port}")
     print("=" * 50)
     
-    # Configuração otimizada para produção
+    # Configura��o otimizada para produ��o
     app.run(
         host='0.0.0.0', 
         port=port, 

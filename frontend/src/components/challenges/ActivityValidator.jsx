@@ -28,17 +28,20 @@ const ActivityValidator = ({ challenge, onValidationComplete }) => {
 
   const loadUserActivities = async () => {
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/devices/activities/user_001`);
+      // CORREÇÃO: Usar endpoint correto /api/fitness/data
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/fitness/stats/user_001`);
       const data = await response.json();
       if (data.success) {
         // Filtrar atividades relevantes para o desafio
-        const relevantActivities = data.activities.filter(activity => 
+        const relevantActivities = data.activities?.filter(activity =>
           isActivityRelevantForChallenge(activity, challenge)
-        );
+        ) || [];
         setUserActivities(relevantActivities);
       }
     } catch (error) {
       console.error('Erro ao carregar atividades:', error);
+      // Fallback: usar dados mock se API falhar
+      setUserActivities([]);
     }
   };
 
@@ -64,7 +67,8 @@ const ActivityValidator = ({ challenge, onValidationComplete }) => {
     setLoading(true);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/devices/validate-activity`, {
+      // CORREÇÃO: Usar endpoint correto /api/fitness/validate-activity
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/fitness/validate-activity`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -86,9 +90,14 @@ const ActivityValidator = ({ challenge, onValidationComplete }) => {
         if (onValidationComplete) {
           onValidationComplete(activity, data.validation);
         }
+
+        // Exibir mensagem de sucesso
+        console.log('✅ Atividade validada com sucesso:', data.validation);
+      } else {
+        console.error('❌ Erro na validação:', data.error);
       }
     } catch (error) {
-      console.error('Erro ao validar atividade:', error);
+      console.error('❌ Erro ao validar atividade:', error);
     } finally {
       setValidatingActivity(null);
       setLoading(false);

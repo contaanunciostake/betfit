@@ -28,15 +28,46 @@ class User(Base):
     total_wins = Column(Integer, default=0)
     total_deposited = Column(Float, default=0.0)
     total_withdrawn = Column(Float, default=0.0)
-    
+
+    # NOVOS campos de perfil
+    profile_picture = Column(String, nullable=True)  # URL da foto de perfil
+    theme_preference = Column(String, default='dark')  # light ou dark
+    bio = Column(Text, nullable=True)  # Biografia do usuário
+    location = Column(String, nullable=True)  # Localização
+    birthdate = Column(DateTime, nullable=True)  # Data de nascimento
+    pix_key = Column(String, nullable=True)  # Chave PIX para saques
+
     # Relacionamentos existentes
     wallets = relationship("Wallet", back_populates="user")
     transactions = relationship("Transaction", back_populates="user")
     challenge_participations = relationship("ChallengeParticipation", back_populates="user")
-    
+
     # NOVOS relacionamentos para fitness
     fitness_connections = relationship("FitnessConnection", back_populates="user")
     fitness_data = relationship("FitnessData", back_populates="user")
+
+    def to_dict(self):
+        """Converter usuário para dicionário (sem senha)"""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'email': self.email,
+            'phone': self.phone,
+            'status': self.status,
+            'kyc_status': self.kyc_status,
+            'profile_picture': self.profile_picture,
+            'theme_preference': self.theme_preference,
+            'bio': self.bio,
+            'location': self.location,
+            'birthdate': self.birthdate.isoformat() if self.birthdate else None,
+            'pix_key': self.pix_key,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'last_login': self.last_login.isoformat() if self.last_login else None,
+            'total_bets': self.total_bets,
+            'total_wins': self.total_wins,
+            'total_deposited': self.total_deposited,
+            'total_withdrawn': self.total_withdrawn
+        }
 
 # NOVOS MODELOS PARA INTEGRAÇÃO FITNESS
 
@@ -544,27 +575,35 @@ class GlobalActivity(Base):
         }
 
 # Configuração do banco - PostgreSQL em produção, SQLite em desenvolvimento
-DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///c:/Temp/BetFit/backend/src/betfit.db')
+DATABASE_URL = os.getenv('DATABASE_URL', '')
+
+if not DATABASE_URL:
+    # Usar SQLite local (desenvolvimento)
+    sqlite_path = os.path.join(os.path.dirname(__file__), 'betfit.db')
+    DATABASE_URL = f'sqlite:///{sqlite_path}'
+    print(f"[INFO] Usando SQLite local: {sqlite_path}")
 
 if DATABASE_URL.startswith('postgresql'):
     # PostgreSQL - sem check_same_thread
     engine = create_engine(DATABASE_URL)
+    print(f"[INFO] Conectado ao PostgreSQL")
 else:
     # SQLite - com check_same_thread=False
     engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+    print(f"[INFO] Conectado ao SQLite local")
 
 SessionLocal = sessionmaker(bind=engine)
 
 # Criar todas as tabelas
 Base.metadata.create_all(engine)
 
-print("✅ Modelos corrigidos - is_active agora é Boolean!")
-print("📊 CORREÇÃO APLICADA:")
+print("[OK] Modelos corrigidos - is_active agora e Boolean!")
+print("[INFO] CORRECAO APLICADA:")
 print("   - ChallengeCategory.is_active: String -> Boolean")
-print("   - FitnessConnection.is_active: já era Boolean")
+print("   - FitnessConnection.is_active: ja era Boolean")
 print("   - ChallengeParticipation.is_winner: Boolean")
-print("🏆 RECURSOS MANTIDOS:")
-print("   - Múltiplos vencedores")
-print("   - Integração fitness")
-print("   - Validação automática")
-print("💾 Banco: PostgreSQL (produção) | SQLite (desenvolvimento)")
+print("[INFO] RECURSOS MANTIDOS:")
+print("   - Multiplos vencedores")
+print("   - Integracao fitness")
+print("   - Validacao automatica")
+print("[INFO] Banco: PostgreSQL (producao) | SQLite (desenvolvimento)")
